@@ -30,11 +30,14 @@ export interface Profile extends User {
   address?: string;
   dob?: string;
   bio?: string;
+  emailVerified?: boolean;
 }
 
 export interface AuthResult {
   user: User | null;
   error?: string;
+  emailVerified?: boolean;
+  needsVerification?: boolean;
 }
 
 export type EventStatus = "upcoming" | "ongoing" | "past";

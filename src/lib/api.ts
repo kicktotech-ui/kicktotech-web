@@ -1,0 +1,61 @@
+/**
+ * Frontend API client. Talks to the same-origin backend under /api/v1 using
+ * HTTP-only cookie sessions (credentials: "include"). Unwraps the standard
+ * response envelope and throws a typed ApiError on failure.
+ *
+ * The UI/service layer depends only on this client — swapping the backend
+ * transport later never touches components.
+ */
+
+export interface ApiErrorShape {
+  code: string;
+  message: string;
+  details?: unknown;
+}
+
+export class ApiError extends Error {
+  code: string;
+  status: number;
+  details?: unknown;
+  constructor(status: number, error: ApiErrorShape) {
+    super(error.message);
+    this.code = error.code;
+    this.status = status;
+    this.details = error.details;
+  }
+}
+
+const BASE = "/api/v1";
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      ...init,
+      credentials: "include",
+      headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    });
+  } catch {
+    throw new ApiError(0, { code: "NETWORK_ERROR", message: "Network error. Please check your connection." });
+  }
+
+  let json: unknown = null;
+  try {
+    json = await res.json();
+  } catch {
+    /* non-JSON response */
+  }
+  const body = json as { success?: boolean; data?: T; error?: ApiErrorShape } | null;
+
+  if (!res.ok || !body?.success) {
+    throw new ApiError(res.status, body?.error ?? { code: "SERVER_ERROR", message: "Something went wrong." });
+  }
+  return body.data as T;
+}
+
+export const api = {
+  get: <T>(path: string) => request<T>(path, { method: "GET" }),
+  post: <T>(path: string, body?: unknown) => request<T>(path, { method: "POST", body: body ? JSON.stringify(body) : undefined }),
+  patch: <T>(path: string, body?: unknown) => request<T>(path, { method: "PATCH", body: body ? JSON.stringify(body) : undefined }),
+  del: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+};

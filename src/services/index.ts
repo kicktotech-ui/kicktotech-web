@@ -9,7 +9,13 @@ export { authService, type AuthService, type SignupInput } from "./auth";
 export { eventService, type EventService } from "./events";
 export { internshipService, type InternshipService } from "./internship";
 export { paymentService, type PaymentService } from "./payments";
-export { certificateService, type CertificateService } from "./certificates";
+export {
+  certificateService,
+  type CertificateService,
+  type PublicCertificate,
+  type VerificationOutcome,
+  type VerificationResult,
+} from "./certificates";
 export { contentService, type ContentService } from "./content";
 export {
   contactService,

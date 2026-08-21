@@ -1,13 +1,13 @@
 import type { AuthResult, Profile, Result, Role } from "@/types";
-import { delay } from "@/lib/utils";
+import { api, ApiError } from "@/lib/api";
 
 /**
- * AuthService — the ONLY boundary the UI talks to for authentication.
- * The mock adapter simulates async auth. A Firebase adapter can replace
- * this later WITHOUT touching any component.
+ * Student AuthService — the ONLY boundary the public UI talks to for auth.
  *
- * Security note: nothing here is a real security boundary. Roles returned
- * are for UX shaping only; real enforcement is server/rules in a later phase.
+ * Now backed by the REAL backend (/api/v1/auth/student/*) using HTTP-only
+ * cookie sessions. No passwords or tokens are stored client-side. The public
+ * `AuthService` interface is unchanged, so AuthProvider / LoginView / SignupView
+ * did not need to change.
  */
 export interface AuthService {
   login(email: string, password: string): Promise<AuthResult>;
@@ -27,66 +27,71 @@ export interface SignupInput {
   company?: string;
 }
 
-const STORAGE_KEY = "ktt.mock.session";
-
-function inferRole(email: string): Role {
-  // UX-only role hinting for the mock. NOT authorization.
-  if (email.endsWith("@kicktotech.in")) return "admin";
-  return "student";
+interface ApiUser {
+  id: string;
+  role: Role;
+  name: string;
+  email: string;
+  phone?: string;
+  college?: string;
+  company?: string;
+  createdAt: string;
 }
 
-const mockAuthService: AuthService = {
+function toProfile(u: ApiUser): Profile {
+  return {
+    uid: u.id,
+    name: u.name,
+    email: u.email,
+    phone: u.phone,
+    role: u.role,
+    college: u.college,
+    company: u.company,
+    createdAt: u.createdAt,
+  };
+}
+
+const realAuthService: AuthService = {
   async login(email, password) {
-    await delay(700);
-    if (!email || !password) return { user: null, error: "Email and password are required." };
-    const user: Profile = {
-      uid: "mock-" + btoa(email).slice(0, 8),
-      name: email.split("@")[0].replace(/[.]/g, " "),
-      email,
-      role: inferRole(email),
-      createdAt: new Date().toISOString(),
-    };
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+    try {
+      const { user } = await api.post<{ user: ApiUser }>("/auth/student/login", { email, password });
+      return { user: toProfile(user) };
+    } catch (e) {
+      return { user: null, error: e instanceof ApiError ? e.message : "Login failed. Please try again." };
     }
-    return { user };
   },
 
   async signup(input) {
-    await delay(900);
-    const user: Profile = {
-      uid: "mock-" + btoa(input.email).slice(0, 8),
-      name: input.name,
-      email: input.email,
-      phone: input.phone,
-      role: input.role,
-      college: input.college,
-      company: input.company,
-      createdAt: new Date().toISOString(),
-    };
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+    try {
+      const { user } = await api.post<{ user: ApiUser }>("/auth/student/register", input);
+      return { user: toProfile(user) };
+    } catch (e) {
+      return { user: null, error: e instanceof ApiError ? e.message : "Could not create account." };
     }
-    return { user };
   },
 
   async logout() {
-    await delay(200);
-    if (typeof window !== "undefined") window.localStorage.removeItem(STORAGE_KEY);
+    try {
+      await api.post("/auth/student/logout");
+    } catch {
+      /* best-effort; cookie is cleared server-side */
+    }
   },
 
   async requestPasswordReset(email) {
-    await delay(700);
     if (!email) return { ok: false, error: "Please enter your email." };
+    // Backend endpoint arrives in a later phase; respond safely for now.
     return { ok: true, data: null };
   },
 
   async getCurrentUser() {
-    await delay(120);
-    if (typeof window === "undefined") return null;
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Profile) : null;
+    try {
+      const { user } = await api.get<{ user: ApiUser }>("/auth/student/me");
+      return toProfile(user);
+    } catch {
+      return null; // 401 → not signed in
+    }
   },
 };
 
-export const authService: AuthService = mockAuthService;
+export const authService: AuthService = realAuthService;

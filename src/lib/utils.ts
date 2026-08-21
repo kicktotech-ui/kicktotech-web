@@ -20,11 +20,14 @@ export function delay(ms = 600): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Stable, human-readable date formatting. */
-export function formatDate(input: string | number | Date): string {
+/** Stable, human-readable date formatting. Handles empty/invalid inputs safely. */
+export function formatDate(input: string | number | Date | null | undefined): string {
+  if (!input) return "—";
+  const d = new Date(input);
+  if (isNaN(d.getTime())) return "—";
   return new Intl.DateTimeFormat("en-IN", {
     day: "numeric",
     month: "short",
     year: "numeric",
-  }).format(new Date(input));
+  }).format(d);
 }

@@ -43,6 +43,18 @@ const config: Config = {
         },
         line: "rgba(255,255,255,0.10)",
         muted: "#8aa6b1",
+        // Admin console semantic tokens (see .ktt-admin in globals.css).
+        // Light/dark values come from CSS variables so utilities auto-adapt.
+        adm: {
+          bg: "rgb(var(--adm-bg) / <alpha-value>)",
+          surface: "rgb(var(--adm-surface) / <alpha-value>)",
+          surface2: "rgb(var(--adm-surface2) / <alpha-value>)",
+          border: "rgb(var(--adm-border) / <alpha-value>)",
+          fg: "rgb(var(--adm-fg) / <alpha-value>)",
+          muted: "rgb(var(--adm-muted) / <alpha-value>)",
+          accent: "rgb(var(--adm-accent) / <alpha-value>)",
+          "accent-fg": "rgb(var(--adm-accent-fg) / <alpha-value>)",
+        },
       },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],

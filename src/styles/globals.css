@@ -125,3 +125,36 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ============================================================================
+   ADMIN DESIGN TOKENS (scoped to .ktt-admin so the public site is untouched)
+   RGB triplets so Tailwind can apply <alpha-value> (e.g. bg-adm-surface/60).
+   Light = defaults on .ktt-admin ; Dark = overrides on .ktt-admin.dark
+   ========================================================================== */
+.ktt-admin {
+  --adm-bg: 248 249 251;        /* #F8F9FB page background */
+  --adm-surface: 255 255 255;   /* #FFFFFF cards / bars      */
+  --adm-surface2: 243 244 246;  /* #F3F4F6 inputs / hover    */
+  --adm-border: 229 231 235;    /* #E5E7EB borders           */
+  --adm-fg: 17 24 39;           /* #111827 primary text      */
+  --adm-muted: 107 114 128;     /* #6B7280 secondary text    */
+  --adm-accent: 245 196 0;      /* #F5C400 Kick To Tech gold */
+  --adm-accent-fg: 17 24 39;    /* text on accent            */
+}
+
+.ktt-admin.dark {
+  --adm-bg: 11 13 15;           /* #0B0D0F */
+  --adm-surface: 17 20 24;      /* #111418 */
+  --adm-surface2: 23 27 32;     /* #171B20 */
+  --adm-border: 37 42 49;       /* #252A31 */
+  --adm-fg: 245 247 250;        /* #F5F7FA */
+  --adm-muted: 156 163 175;     /* #9CA3AF */
+  --adm-accent: 245 196 0;      /* gold stays */
+  --adm-accent-fg: 17 24 39;
+}
+
+/* Smooth, one-shot theme transition on switch (kept to color props only). */
+.ktt-admin,
+.ktt-admin *:not(svg):not(path) {
+  transition: background-color 220ms ease, border-color 220ms ease, color 200ms ease;
+}

@@ -28,11 +28,13 @@ const EDGES: [number, number][] = [
 ];
 
 export function AuthShell({
+  eyebrow,
   title,
   subtitle,
   children,
   footer,
 }: {
+  eyebrow?: string;
   title: string;
   subtitle?: string;
   children: ReactNode;
@@ -98,6 +100,7 @@ export function AuthShell({
             <Logo />
           </div>
           <div className="glass-strong rounded-3xl p-7 shadow-card sm:p-9">
+            {eyebrow && <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-accent">{eyebrow}</p>}
             <h1 className="text-2xl font-bold sm:text-3xl">{title}</h1>
             {subtitle && <p className="mt-2 text-sm text-muted">{subtitle}</p>}
             <div className="mt-7">{children}</div>
