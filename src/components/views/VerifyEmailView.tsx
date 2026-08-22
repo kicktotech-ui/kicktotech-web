@@ -48,7 +48,7 @@ export function VerifyEmailView() {
         setVerified(true);
         // Call backend with server-side delivery state and concurrency protection
         try {
-          const token = await refreshedUser.getIdToken();
+          const token = await refreshedUser.getIdToken(true);
           await fetch("/api/v1/auth/student/welcome", {
             method: "POST",
             headers: {

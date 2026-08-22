@@ -87,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Legacy profiles without welcomeEmailStatus are treated as "pending".
         if (fbUser.emailVerified && profile.welcomeEmailStatus !== "sent") {
           try {
-            const token = await fbUser.getIdToken();
+            const token = await fbUser.getIdToken(true);
             await fetch("/api/v1/auth/student/welcome", {
               method: "POST",
               headers: {
