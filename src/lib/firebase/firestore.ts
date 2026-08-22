@@ -29,6 +29,15 @@ export interface StudentProfile {
   emailVerified: boolean;
   createdAt: unknown; // serverTimestamp
   updatedAt: unknown; // serverTimestamp
+  /**
+   * Server-controlled welcome-email delivery state.
+   * "pending" → not yet sent, "sending" → claimed by a server request,
+   * "sent" → Brevo accepted the email. Only the server may write this field.
+   * Missing on legacy profiles — treat as "pending".
+   */
+  welcomeEmailStatus?: "pending" | "sending" | "sent";
+  /** ISO timestamp of the last welcomeEmailStatus change (server-set). */
+  welcomeEmailStatusUpdatedAt?: unknown;
 }
 
 /**
@@ -60,6 +69,7 @@ export async function createStudentProfile(
       company: data.company ?? null,
       role: data.role,
       emailVerified: false,
+      welcomeEmailStatus: "pending",
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });

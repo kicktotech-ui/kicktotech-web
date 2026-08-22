@@ -5,6 +5,7 @@ import { AppError } from "./http";
 import { getPaymentConfig, publicPaymentInfo, buildWhatsappUrl, type PublicPaymentInfo } from "./payments/config";
 import { resolveMentorForDomain, normalizeCertificateDomain, DOMAIN_META } from "@/lib/certificates/mentors";
 import type { ApplicationInput } from "./validation";
+import { sendBrevoTemplateEmail } from "./email/brevo";
 
 /*
  * Internship application service — the manual UPI + WhatsApp payment gate.
@@ -64,6 +65,10 @@ export async function submitApplication(input: ApplicationInput): Promise<Submit
       dedupeKey,
     };
     application = await store.createApplication(record);
+
+    // Fire-and-forget: attempt to send confirmation email via Brevo.
+    // Failure does NOT block or roll back the application.
+    sendApplicationConfirmationEmail(record).catch(() => {});
   }
 
   if (!application) throw new AppError("SERVER_ERROR", "Could not create the application.");
@@ -126,4 +131,36 @@ export async function markApplicationCertified(applicationId: string, certificat
   const app = await store.getApplicationByAppId(applicationId);
   if (!app) return;
   await store.updateApplication(app.id, { status: "CERTIFICATE_ISSUED", certificateId, updatedAt: new Date().toISOString() });
+}
+
+// ---------------------------------------------------------------------------
+// Brevo confirmation email (fire-and-forget helper)
+// ---------------------------------------------------------------------------
+
+/**
+ * Attempt to send an application confirmation email via Brevo.
+ * This is deliberately non-transactional with the application: if Brevo fails,
+ * the application still exists. The result is logged server-side only.
+ */
+async function sendApplicationConfirmationEmail(app: ApplicationRecord): Promise<void> {
+  const templateId = Number(process.env.BREVO_TEMPLATE_ID ?? 1);
+  const domainLabel = DOMAIN_META[app.domain as keyof typeof DOMAIN_META]?.label ?? app.domain;
+
+  const result = await sendBrevoTemplateEmail({
+    to: { email: app.email, name: app.name },
+    templateId,
+    params: {
+      name: app.name,
+      email: app.email,
+      domain: domainLabel,
+      applicationId: app.applicationId,
+      amount: app.amount ?? 0,
+    },
+  });
+
+  if (result.success) {
+    console.info(`[applications] Confirmation email sent for application ${app.applicationId}`);
+  } else {
+    console.warn(`[applications] Confirmation email failed for application ${app.applicationId}: ${result.error}`);
+  }
 }

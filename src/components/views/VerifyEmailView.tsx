@@ -9,7 +9,6 @@ import {
   firebaseRefreshUser,
   firebaseLogout,
 } from "@/lib/firebase/firebaseAuth";
-import { updateStudentProfile } from "@/lib/firebase/firestore";
 import { AuthShell } from "@/components/layout/AuthShell";
 import { Button } from "@/components/ui/Button";
 
@@ -47,8 +46,18 @@ export function VerifyEmailView() {
       const { emailVerified, user: refreshedUser } = await firebaseRefreshUser();
       if (emailVerified && refreshedUser) {
         setVerified(true);
-        // Update Firestore profile
-        await updateStudentProfile(refreshedUser.uid, { emailVerified: true });
+        // Call backend with server-side delivery state and concurrency protection
+        try {
+          const token = await refreshedUser.getIdToken();
+          await fetch("/api/v1/auth/student/welcome", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${token}`
+            }
+          });
+        } catch (e) {
+          console.error("Failed to sync verification state via welcome endpoint:", e);
+        }
         // Refresh auth context
         await refresh();
         // Stop polling

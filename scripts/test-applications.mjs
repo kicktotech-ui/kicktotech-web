@@ -39,7 +39,7 @@ async function main() {
   const email = `applicant.${Date.now()}@example.com`;
 
   // 1) Public apply → PAYMENT_PENDING + payment info.
-  const a1 = await call("POST", "/internship/apply", { name: "Lakhan Patil", email, phone: "9325490236", college: "JSPM", year: "3rd", domain: "python" });
+  const a1 = await call("POST", "/internship/apply", { name: "Mayur Patil", email, phone: "8007400498", college: "JSPM", year: "3rd", domain: "python" });
   assert.equal(a1.status, 201, JSON.stringify(a1.json));
   const appId = a1.json.data.applicationId;
   assert.match(appId, /^APP-\d{4}-[A-Z0-9]{6}$/, "human application id");
@@ -49,7 +49,7 @@ async function main() {
   console.log(`✓ apply → ${appId} (PENDING), UPI uri present`);
 
   // 2) Idempotency: same email+domain → same application id, duplicate flag.
-  const a2 = await call("POST", "/internship/apply", { name: "Lakhan Patil", email, phone: "9325490236", domain: "python" });
+  const a2 = await call("POST", "/internship/apply", { name: "Mayur Patil", email, phone: "8007400498", domain: "python" });
   assert.equal(a2.status, 200, "duplicate → 200");
   assert.equal(a2.json.data.duplicate, true);
   assert.equal(a2.json.data.applicationId, appId, "no duplicate application");
@@ -57,7 +57,7 @@ async function main() {
 
   // 3) Certificate issuance BLOCKED before verification.
   await call("POST", "/auth/admin/login", { email: ADMIN_EMAIL, password: ADMIN_PW });
-  const blocked = await call("POST", "/admin/certificates", { recipientName: "Lakhan Patil", program: "Python Programming with AI Project", domain: "python", applicationId: appId });
+  const blocked = await call("POST", "/admin/certificates", { recipientName: "Mayur Patil", program: "Python Programming with AI Project", domain: "python", applicationId: appId });
   assert.equal(blocked.status, 403, `issuance must be blocked pre-verify: ${JSON.stringify(blocked.json)}`);
   console.log("✓ issuance blocked before payment verified (403)");
 
@@ -74,7 +74,7 @@ async function main() {
   console.log("✓ admin verify → PAYMENT_VERIFIED");
 
   // 6) Now issuance is allowed + links back to the application.
-  const issue = await call("POST", "/admin/certificates", { recipientName: "Lakhan Patil", program: "Python Programming with AI Project", domain: "python", mentorId: "omkar-pawar", applicationId: appId });
+  const issue = await call("POST", "/admin/certificates", { recipientName: "Mayur Patil", program: "Python Programming with AI Project", domain: "python", mentorId: "omkar-pawar", applicationId: appId });
   assert.equal(issue.status, 201, `issue after verify: ${JSON.stringify(issue.json)}`);
   const certId = issue.json.data.certificate.certificateId;
   assert.equal(issue.json.data.certificate.mentorName, "Omkar Pawar");

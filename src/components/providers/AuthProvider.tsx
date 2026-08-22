@@ -82,9 +82,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           emailVerified: fbUser.emailVerified,
         });
 
-        // Sync emailVerified from Firebase Auth → Firestore if changed
-        if (fbUser.emailVerified && !profile.emailVerified) {
-          await updateStudentProfile(fbUser.uid, { emailVerified: true });
+        // Trigger welcome-email endpoint if not yet successfully sent.
+        // Server-side concurrency protection prevents duplicate sends.
+        // Legacy profiles without welcomeEmailStatus are treated as "pending".
+        if (fbUser.emailVerified && profile.welcomeEmailStatus !== "sent") {
+          try {
+            const token = await fbUser.getIdToken();
+            await fetch("/api/v1/auth/student/welcome", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${token}`
+              }
+            });
+          } catch (e) {
+            console.error("Failed to sync verification state via welcome endpoint:", e);
+          }
         }
       } else {
         // Firebase user exists but no Firestore profile yet (edge case)

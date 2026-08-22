@@ -1,4 +1,5 @@
 import type { Firestore } from "firebase-admin/firestore";
+import type { Auth } from "firebase-admin/auth";
 
 /**
  * Firebase ADMIN SDK (server-side) initialization — singleton, HMR-safe, and
@@ -12,7 +13,7 @@ import type { Firestore } from "firebase-admin/firestore";
  * server-side privileged access requires a service account.
  */
 
-const globalRef = globalThis as unknown as { __kttAdminDb?: Firestore };
+const globalRef = globalThis as unknown as { __kttAdminDb?: Firestore; __kttAdminAuth?: Auth };
 
 export function isAdminConfigured(): boolean {
   return Boolean(
@@ -55,4 +56,30 @@ export async function getAdminDb(): Promise<Firestore> {
   }
   globalRef.__kttAdminDb = db;
   return db;
+}
+
+export async function getAdminAuth(): Promise<Auth> {
+  if (!isAdminConfigured()) {
+    throw new Error(
+      "Firebase Admin is not configured. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY in .env.local.",
+    );
+  }
+  if (globalRef.__kttAdminAuth) return globalRef.__kttAdminAuth;
+
+  const { initializeApp, getApps, cert } = await import("firebase-admin/app");
+  const { getAuth } = await import("firebase-admin/auth");
+
+  const app = getApps().length
+    ? getApps()[0]
+    : initializeApp({
+        credential: cert({
+          projectId: process.env.FIREBASE_PROJECT_ID,
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+        }),
+      });
+
+  const auth = getAuth(app);
+  globalRef.__kttAdminAuth = auth;
+  return auth;
 }
