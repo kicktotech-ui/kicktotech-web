@@ -15,7 +15,7 @@ import { getFirebaseClient } from "./client";
    ========================================================================== */
 
 /** The Firestore collection name for student profiles. */
-const STUDENTS_COLLECTION = "students";
+const STUDENTS_COLLECTION = "users";
 
 /** Shape of a student profile document in Firestore. */
 export interface StudentProfile {

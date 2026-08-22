@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
 
     // ---- 3. Firestore transaction: claim the welcome-email send ----
     const db = await getAdminDb();
-    const studentRef = db.collection("students").doc(uid);
+    const studentRef = db.collection("users").doc(uid);
 
     const transactionResult = await db.runTransaction(async (t) => {
       const doc = await t.get(studentRef);
