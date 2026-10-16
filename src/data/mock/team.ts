@@ -28,14 +28,6 @@ export const team: TeamMember[] = [
     bio: "Mr. Kaustubh Pawar is the Co-Founder of Kick To Tech Community, a forward-thinking, student-driven leader helping shape the organization's vision and growth.",
   },
   {
-    id: "niraj-padwale",
-    name: "Niraj Sanjay Padwale",
-    role: "Finance Lead",
-    photo: "/team/niraj-padwale.png",
-    objectPosition: "center 20%",
-    bio: "Niraj serves as the Finance Head of the Kick To Tech Community, playing a crucial leadership role in managing and overseeing all financial operations of the organization. He ensures effective financial planning, structured budgeting, transparent fund allocation, and compliance with financial policies. His role directly supports the smooth execution of events, workshops, hackathons, collaborations, and strategic initiatives conducted by the community.",
-  },
-  {
     id: "kanchan-patil",
     name: "Kanchan Patil",
     role: "Managing Director",
@@ -44,14 +36,6 @@ export const team: TeamMember[] = [
     objectPosition: "center 20%",
     linkedin: "https://www.linkedin.com/in/kanchan-patil-6a459732b/",
     bio: "Ms. Kanchan Patil serves as the Managing Director at Kick To Tech Community, where she plays a vital role in coordinating operations and keeping initiatives running smoothly.",
-  },
-  {
-    id: "kalpak-narkhede",
-    name: "Kalpak Narkhede",
-    role: "Collaboration & Outreach Head",
-    photo: "/team/kalpak-narkhede.png",
-    objectPosition: "center 20%",
-    bio: "Kalpak serves as the Collaboration & Outreach Head of the Kick To Tech Community, leading strategic outreach and partnership initiatives.",
   },
   {
     id: "tauheed",
@@ -108,5 +92,21 @@ export const team: TeamMember[] = [
     photo: "/team/samruddhi-more.png",
     objectPosition: "center 20%",
     bio: "Samruddhi is appointed as a Research Assistant at Kick To Tech, where she supports innovation-driven projects through research and collaboration.",
+  },
+  {
+    id: "niraj-padwale",
+    name: "Niraj Sanjay Padwale",
+    role: "Member",
+    photo: "/team/niraj-padwale.png",
+    objectPosition: "center 20%",
+    bio: "Niraj serves as the Finance Head of the Kick To Tech Community, playing a crucial leadership role in managing and overseeing all financial operations of the organization. He ensures effective financial planning, structured budgeting, transparent fund allocation, and compliance with financial policies. His role directly supports the smooth execution of events, workshops, hackathons, collaborations, and strategic initiatives conducted by the community.",
+  },
+  {
+    id: "kalpak-narkhede",
+    name: "Kalpak Narkhede",
+    role: "Member",
+    photo: "/team/kalpak-narkhede.png",
+    objectPosition: "center 20%",
+    bio: "Kalpak serves as the Collaboration & Outreach Head of the Kick To Tech Community, leading strategic outreach and partnership initiatives.",
   },
 ];
