@@ -13,12 +13,12 @@ import { formatINR } from "@/lib/utils";
 export const metadata: Metadata = {
   title: "Internship",
   description:
-    "A project-first, 5-week internship across Python (AI), Java, Cybersecurity, and Data Analytics — with a verifiable certificate.",
+    "A project-first, 5-week internship across Python and Java — with a verifiable certificate.",
 };
 
 const heroStats = [
   { Icon: Clock, value: "5 Weeks", label: "18 May – 21 Jun 2026" },
-  { Icon: Layers, value: "4 Tracks", label: "Mentored domains" },
+  { Icon: Layers, value: "2 Tracks", label: "Mentored domains" },
   { Icon: BadgeCheck, value: formatINR(internshipProgram.priceRupees), label: "Program fee" },
   { Icon: ShieldCheck, value: "Verifiable", label: "Certificate" },
 ];
@@ -44,7 +44,7 @@ export default function InternshipPage() {
               Kickstart your <span className="text-gradient">tech career.</span>
             </h1>
             <p className="mt-5 max-w-2xl text-pretty text-lg leading-relaxed text-muted">
-              A project-first internship across four in-demand domains — learn from industry
+              A project-first internship across two in-demand domains — learn from industry
               standards, build real work, and earn a certificate employers can verify.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -69,7 +69,7 @@ export default function InternshipPage() {
       {/* DOMAINS — interactive selector */}
       <Section className="pt-10">
         <Container>
-          <SectionHeading eyebrow="Domains" title="Choose your track" description="Four focused domains, each mentored and project-driven. Explore what you'll learn." />
+          <SectionHeading eyebrow="Domains" title="Choose your track" description="Two focused domains, each mentored and project-driven. Explore what you'll learn." />
           <div className="mt-14">
             <InternshipDomains domains={internshipProgram.domains} />
           </div>

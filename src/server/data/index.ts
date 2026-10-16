@@ -109,6 +109,10 @@ export interface ApplicationRecord {
   email: string;
   phone: string;
   college?: string;
+  prn?: string;
+  schoolName?: string;
+  division?: string;
+  course?: string;
   year?: string;
   city?: string;
   domain: string;

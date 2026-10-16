@@ -87,7 +87,7 @@ export function TeamProfile({ member, onClose }: { member: TeamMember | null; on
                   rel="noopener noreferrer"
                   className="mt-7 inline-flex items-center gap-2 rounded-xl bg-[#0A66C2] px-5 py-2.5 font-semibold text-white transition-transform hover:-translate-y-0.5"
                 >
-                  <Linkedin className="h-4 w-4" /> Get in touch
+                  <Linkedin className="h-4 w-4" /> Connect on LinkedIn
                 </a>
               )}
             </div>

@@ -41,7 +41,7 @@ export function DomainCard({
         ))}
       </div>
       {domain.mentor && (
-        <div className="mt-5 flex items-center gap-2.5 border-t border-line pt-4">
+        <div className="mt-auto flex items-center gap-2.5 border-t border-line pt-4">
           <Avatar name={domain.mentor} src={domain.mentorImage} size={32} rounded="full" />
           <span className="text-xs text-muted">
             Mentor · <span className="text-primary-foreground/80">{domain.mentor}</span>
@@ -52,7 +52,7 @@ export function DomainCard({
   );
 
   const base = cn(
-    "h-full rounded-3xl border bg-surface p-7 text-left transition-all duration-300",
+    "flex h-full flex-col rounded-3xl border bg-surface p-7 text-left transition-all duration-300",
     selected ? "border-accent shadow-glow" : "border-line",
     interactive && "hover:-translate-y-1.5 hover:border-accent/50",
   );

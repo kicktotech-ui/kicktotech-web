@@ -46,8 +46,8 @@ const roadmap = (slug: DomainSlug): RoadmapModule[] => [
 ];
 
 export const domains: Domain[] = [
-  { id: "python", title: "Python (AI + Projects)", slug: "python", accent: "#0057ff", description: "Hands-on Python extended into applied AI, automation, and real project delivery.", priceRupees: 222, originalPriceRupees: 999, durationLabel: "5 Weeks", enrolled: 0, completionRate: 0, roadmap: roadmap("python"), resources: [] },
-  { id: "java", title: "Java Development", slug: "java", accent: "#ea580c", description: "Core Java, OOP, and backend fundamentals with clean, production-grade code.", priceRupees: 222, originalPriceRupees: 999, durationLabel: "5 Weeks", enrolled: 0, completionRate: 0, roadmap: roadmap("java"), resources: [] },
+  { id: "python", title: "Python (AI + Projects)", slug: "python", accent: "#0057ff", description: "Hands-on Python extended into applied AI, automation, and real project delivery.", priceRupees: 449, originalPriceRupees: 999, durationLabel: "5 Weeks", enrolled: 0, completionRate: 0, roadmap: roadmap("python"), resources: [] },
+  { id: "java", title: "Java Development", slug: "java", accent: "#ea580c", description: "Core Java, OOP, and backend fundamentals with clean, production-grade code.", priceRupees: 449, originalPriceRupees: 999, durationLabel: "5 Weeks", enrolled: 0, completionRate: 0, roadmap: roadmap("java"), resources: [] },
   { id: "data-analytics", title: "Data Analytics", slug: "data-analytics", accent: "#7c3aed", description: "From raw data to decisions — analysis, visualization, and storytelling.", priceRupees: 222, originalPriceRupees: 999, durationLabel: "5 Weeks", enrolled: 0, completionRate: 0, roadmap: roadmap("data-analytics"), resources: [] },
   { id: "cybersecurity", title: "Cybersecurity", slug: "cybersecurity", accent: "#16a34a", description: "Defend systems and think like an attacker with practical security labs.", priceRupees: 222, originalPriceRupees: 999, durationLabel: "5 Weeks", enrolled: 0, completionRate: 0, roadmap: roadmap("cybersecurity"), resources: [] },
 ];

@@ -21,7 +21,7 @@ export function InternshipHighlight() {
             Kickstart your <span className="text-gradient">tech career</span>
           </h2>
           <p className="mt-4 text-pretty text-muted">
-            A project-first internship across four in-demand domains. Learn from industry
+            A project-first internship across two in-demand domains. Learn from industry
             standards, build real work, and earn a verifiable certificate.
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm">
@@ -34,7 +34,7 @@ export function InternshipHighlight() {
           </div>
         </Reveal>
 
-        <StaggerGroup className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <StaggerGroup className="mx-auto mt-14 grid max-w-3xl gap-6 sm:grid-cols-2">
           {domains.map((d) => (
             <StaggerItem key={d.id} className="h-full">
               <DomainCard domain={d} />

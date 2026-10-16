@@ -59,10 +59,15 @@ export const applicationSchema = z.object({
   name: z.string().trim().min(2, "Enter your full name.").max(80),
   email: emailSchema,
   phone: z.string().trim().min(6, "Enter a valid phone number.").max(20),
+  // PRN is a STRING to preserve leading zeros; not coerced to number.
+  prn: z.string().trim().min(1, "Enter your PRN.").max(40),
   college: z.string().trim().max(120).optional(),
+  schoolName: z.string().trim().min(1, "Enter your school name.").max(160),
+  division: z.string().trim().min(1, "Enter your division.").max(40),
+  course: z.string().trim().min(1, "Enter your course.").max(120),
   year: z.string().trim().max(40).optional(),
   city: z.string().trim().max(80).optional(),
-  domain: z.enum(["python", "java", "data-analytics", "cybersecurity"]),
+  domain: z.enum(["python", "java"]),
 });
 
 /** Mark payment proof as submitted (public, by application id). */

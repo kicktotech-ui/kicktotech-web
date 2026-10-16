@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Check, Loader2, ArrowRight, ArrowLeft, ShieldCheck, Copy, MessageCircle, Clock, BadgeCheck } from "lucide-react";
 import { internshipProgram } from "@/data/mock/internship";
@@ -15,6 +16,8 @@ import { cn, formatINR } from "@/lib/utils";
 const formSteps = ["Personal", "Academic", "Domain", "Review"] as const;
 const phases = ["Information", "Payment", "Verification", "Certificate"] as const;
 
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
 interface PaymentInfo {
   upiId: string; payeeName: string; amount: number; currency: string; upiUri: string;
   whatsappNumber: string; whatsappConfigured: boolean;
@@ -24,24 +27,55 @@ interface ApplyResponse { applicationId: string; status: string; duplicate: bool
 type Phase = "form" | "pay" | "proof" | "submitted";
 
 export function RegisterFlow() {
+  const searchParams = useSearchParams();
   const [phase, setPhase] = useState<Phase>("form");
   const [step, setStep] = useState(0);
   const [personal, setPersonal] = useState({ name: "", email: "", phone: "" });
-  const [academic, setAcademic] = useState({ college: "", year: "", city: "" });
-  const [domainId, setDomainId] = useState<string | null>(null);
+  const [academic, setAcademic] = useState({ college: "", schoolName: "", course: "", division: "", year: "", prn: "" });
+  // Preselect the track from the URL (?domain=python|java). Ignore any removed/unknown value.
+  const [domainId, setDomainId] = useState<string | null>(() => {
+    const d = searchParams.get("domain");
+    return d === "python" || d === "java" ? d : null;
+  });
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [applied, setApplied] = useState<ApplyResponse | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const markTouched = (key: string) => setTouched((t) => ({ ...t, [key]: true }));
+
   const domain = internshipProgram.domains.find((d) => d.id === domainId);
   const activePhase = phase === "form" ? 0 : phase === "pay" || phase === "proof" ? 1 : 2;
 
+  // Per-field validation (authoritative check still runs server-side).
+  const fieldError: Record<string, string | undefined> = {
+    name: !personal.name.trim() ? "Enter your full name." : undefined,
+    email: !personal.email.trim() ? "Enter your email address." : !EMAIL_RE.test(personal.email) ? "Enter a valid email address." : undefined,
+    phone: !personal.phone.trim() ? "Enter your phone number." : undefined,
+    prn: !academic.prn.trim() ? "Enter your PRN." : undefined,
+    college: !academic.college.trim() ? "Enter your college name." : undefined,
+    schoolName: !academic.schoolName.trim() ? "Enter your school name." : undefined,
+    course: !academic.course.trim() ? "Enter your course." : undefined,
+    division: !academic.division.trim() ? "Enter your division." : undefined,
+    year: !academic.year.trim() ? "Enter your year of study." : undefined,
+  };
+  const errOf = (key: string) => (touched[key] ? fieldError[key] : undefined);
+
   const canNext =
-    (step === 0 && personal.name && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(personal.email) && personal.phone) ||
-    (step === 1 && academic.college && academic.year) ||
-    (step === 2 && domainId) ||
+    (step === 0 && !fieldError.name && !fieldError.email && !fieldError.phone && !fieldError.prn) ||
+    (step === 1 && !fieldError.college && !fieldError.schoolName && !fieldError.course && !fieldError.division && !fieldError.year) ||
+    (step === 2 && Boolean(domainId)) ||
     step === 3;
+
+  function goNext() {
+    const stepKeys = step === 0 ? ["name", "email", "phone", "prn"] : step === 1 ? ["college", "schoolName", "course", "division", "year"] : [];
+    if (!canNext) {
+      setTouched((t) => ({ ...t, ...Object.fromEntries(stepKeys.map((k) => [k, true])) }));
+      return;
+    }
+    setStep((s) => s + 1);
+  }
 
   async function continueToPayment() {
     if (!domainId) return;
@@ -50,7 +84,9 @@ export function RegisterFlow() {
     try {
       const res = await api.post<ApplyResponse>("/internship/apply", {
         name: personal.name, email: personal.email, phone: personal.phone,
-        college: academic.college, year: academic.year, city: academic.city, domain: domainId,
+        prn: academic.prn, college: academic.college, schoolName: academic.schoolName,
+        division: academic.division, course: academic.course, year: academic.year,
+        domain: domainId,
       });
       setApplied(res);
       setPhase("pay");
@@ -106,24 +142,45 @@ export function RegisterFlow() {
               {step === 0 && (
                 <div className="space-y-5">
                   <h2 className="text-xl font-bold">Personal information</h2>
-                  <FormField label="Full name" htmlFor="r-name"><Input id="r-name" value={personal.name} onChange={(e) => setPersonal({ ...personal, name: e.target.value })} placeholder="Your name" /></FormField>
-                  <FormField label="Email" htmlFor="r-email"><Input id="r-email" type="email" value={personal.email} onChange={(e) => setPersonal({ ...personal, email: e.target.value })} placeholder="you@example.com" /></FormField>
-                  <FormField label="Phone" htmlFor="r-phone"><Input id="r-phone" value={personal.phone} onChange={(e) => setPersonal({ ...personal, phone: e.target.value })} placeholder="+91 ..." /></FormField>
+                  <FormField label="Full name" htmlFor="r-name" error={errOf("name")}>
+                    <Input id="r-name" value={personal.name} invalid={Boolean(errOf("name"))} onBlur={() => markTouched("name")} onChange={(e) => setPersonal({ ...personal, name: e.target.value })} placeholder="Your full name" />
+                  </FormField>
+                  <FormField label="Email ID" htmlFor="r-email" error={errOf("email")}>
+                    <Input id="r-email" type="email" value={personal.email} invalid={Boolean(errOf("email"))} onBlur={() => markTouched("email")} onChange={(e) => setPersonal({ ...personal, email: e.target.value })} placeholder="you@example.com" />
+                  </FormField>
+                  <FormField label="Phone number" htmlFor="r-phone" error={errOf("phone")}>
+                    <Input id="r-phone" type="tel" value={personal.phone} invalid={Boolean(errOf("phone"))} onBlur={() => markTouched("phone")} onChange={(e) => setPersonal({ ...personal, phone: e.target.value })} placeholder="+91 98765 43210" />
+                  </FormField>
+                  <FormField label="PRN (Permanent Registration Number)" htmlFor="r-prn" error={errOf("prn")}>
+                    <Input id="r-prn" value={academic.prn} invalid={Boolean(errOf("prn"))} onBlur={() => markTouched("prn")} onChange={(e) => setAcademic({ ...academic, prn: e.target.value })} placeholder="e.g. 2024CS001" />
+                  </FormField>
                 </div>
               )}
               {step === 1 && (
                 <div className="space-y-5">
                   <h2 className="text-xl font-bold">Academic details</h2>
-                  <FormField label="College / Institution" htmlFor="r-college"><Input id="r-college" value={academic.college} onChange={(e) => setAcademic({ ...academic, college: e.target.value })} placeholder="Your college" /></FormField>
+                  <FormField label="College name" htmlFor="r-college" error={errOf("college")}>
+                    <Input id="r-college" value={academic.college} invalid={Boolean(errOf("college"))} onBlur={() => markTouched("college")} onChange={(e) => setAcademic({ ...academic, college: e.target.value })} placeholder="Your college / institution" />
+                  </FormField>
+                  <FormField label="School name" htmlFor="r-school" error={errOf("schoolName")}>
+                    <Input id="r-school" value={academic.schoolName} invalid={Boolean(errOf("schoolName"))} onBlur={() => markTouched("schoolName")} onChange={(e) => setAcademic({ ...academic, schoolName: e.target.value })} placeholder="Your school name" />
+                  </FormField>
                   <div className="grid gap-5 sm:grid-cols-2">
-                    <FormField label="Year" htmlFor="r-year"><Input id="r-year" value={academic.year} onChange={(e) => setAcademic({ ...academic, year: e.target.value })} placeholder="e.g. 2nd year" /></FormField>
-                    <FormField label="City" htmlFor="r-city"><Input id="r-city" value={academic.city} onChange={(e) => setAcademic({ ...academic, city: e.target.value })} placeholder="Pune" /></FormField>
+                    <FormField label="Course" htmlFor="r-course" error={errOf("course")}>
+                      <Input id="r-course" value={academic.course} invalid={Boolean(errOf("course"))} onBlur={() => markTouched("course")} onChange={(e) => setAcademic({ ...academic, course: e.target.value })} placeholder="e.g. B.Tech CSE" />
+                    </FormField>
+                    <FormField label="Division" htmlFor="r-division" error={errOf("division")}>
+                      <Input id="r-division" value={academic.division} invalid={Boolean(errOf("division"))} onBlur={() => markTouched("division")} onChange={(e) => setAcademic({ ...academic, division: e.target.value })} placeholder="e.g. A" />
+                    </FormField>
                   </div>
+                  <FormField label="Year of study" htmlFor="r-year" error={errOf("year")}>
+                    <Input id="r-year" value={academic.year} invalid={Boolean(errOf("year"))} onBlur={() => markTouched("year")} onChange={(e) => setAcademic({ ...academic, year: e.target.value })} placeholder="e.g. 2nd year" />
+                  </FormField>
                 </div>
               )}
               {step === 2 && (
                 <div>
-                  <h2 className="mb-5 text-xl font-bold">Choose your domain</h2>
+                  <h2 className="mb-5 text-xl font-bold">Choose your internship track</h2>
                   <div className="grid gap-4 sm:grid-cols-2">
                     {internshipProgram.domains.map((d) => (
                       <DomainCard key={d.id} domain={d} selected={domainId === d.id} onSelect={setDomainId} />
@@ -137,8 +194,9 @@ export function RegisterFlow() {
                   <dl className="divide-y divide-line rounded-2xl border border-line">
                     {[
                       ["Name", personal.name], ["Email", personal.email], ["Phone", personal.phone],
-                      ["College", academic.college], ["Year", academic.year],
-                      ["Domain", domain?.title ?? "-"], ["Mentor", domain?.mentor ?? "-"],
+                      ["PRN", academic.prn], ["College", academic.college], ["School", academic.schoolName],
+                      ["Course", academic.course], ["Division", academic.division], ["Year of study", academic.year],
+                      ["Internship track", domain?.title ?? "-"], ["Mentor", domain?.mentor ?? "-"],
                       ["Processing fee", formatINR(internshipProgram.priceRupees)],
                     ].map(([k, v]) => (
                       <div key={k} className="flex justify-between gap-4 p-4 text-sm"><dt className="text-muted">{k}</dt><dd className="font-medium">{v}</dd></div>
@@ -152,7 +210,7 @@ export function RegisterFlow() {
               <div className="mt-8 flex items-center justify-between">
                 <Button variant="ghost" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0}><ArrowLeft className="h-4 w-4" /> Back</Button>
                 {step < 3 ? (
-                  <Button onClick={() => canNext && setStep((s) => s + 1)} disabled={!canNext}>Continue <ArrowRight className="h-4 w-4" /></Button>
+                  <Button onClick={goNext} disabled={!canNext}>Continue <ArrowRight className="h-4 w-4" /></Button>
                 ) : (
                   <Button onClick={continueToPayment} disabled={submitting}>{submitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Please wait…</> : <>Continue to payment <ArrowRight className="h-4 w-4" /></>}</Button>
                 )}

@@ -21,7 +21,7 @@ export function getPaymentConfig(): PaymentConfig {
   return {
     upiId: process.env.PAYMENT_UPI_ID?.trim() || "example@upi",
     payeeName: process.env.PAYMENT_PAYEE_NAME?.trim() || "Kick To Tech",
-    amount: Number(process.env.PAYMENT_AMOUNT ?? 222) || 222,
+    amount: Number(process.env.PAYMENT_AMOUNT ?? 449) || 449,
     currency: "INR",
     whatsappNumber: (process.env.PAYMENT_WHATSAPP_NUMBER ?? "").replace(/[^\d]/g, ""),
     note: process.env.PAYMENT_NOTE?.trim() || "Kick To Tech certificate processing fee",

@@ -24,6 +24,7 @@ export const team: TeamMember[] = [
     featured: true,
     photo: "/team/kaustubh-pawar.jpg",
     objectPosition: "center 25%",
+    linkedin: "https://www.linkedin.com/in/kaustubh-pawar-228a562ab/",
     bio: "Mr. Kaustubh Pawar is the Co-Founder of Kick To Tech Community, a forward-thinking, student-driven leader helping shape the organization's vision and growth.",
   },
   {
@@ -39,7 +40,8 @@ export const team: TeamMember[] = [
     name: "Kanchan Patil",
     role: "Management Head",
     photo: "/team/kanchan-patil.jpg",
-    objectPosition: "center 30%",
+    objectPosition: "center 20%",
+    linkedin: "https://www.linkedin.com/in/kanchan-patil-6a459732b/",
     bio: "Ms. Kanchan Patil serves as the Management Head at Kick To Tech Community, where she plays a vital role in coordinating operations and keeping initiatives running smoothly.",
   },
   {
