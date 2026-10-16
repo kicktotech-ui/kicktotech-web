@@ -20,7 +20,7 @@ export const team: TeamMember[] = [
   {
     id: "kaustubh-pawar",
     name: "Kaustubh Pawar",
-    role: "Co-Founder",
+    role: "Co-Founder & CEO",
     featured: true,
     photo: "/team/kaustubh-pawar.jpg",
     objectPosition: "center 20%",
