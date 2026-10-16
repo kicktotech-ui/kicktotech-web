@@ -67,9 +67,8 @@ const NODES: NetNode[] = [
 
   { id: "mayur", kind: "member", label: "Mayur Patil", sub: "Founder", photo: "/team/mayur-patil.png", objectPosition: "center 20%", color: C.member, x: 76, y: 76, size: 78 },
   { id: "kanchan", kind: "member", label: "Kanchan Patil", sub: "Managing Director", photo: "/team/kanchan-patil.jpg", objectPosition: "center 30%", color: C.member, x: 74, y: 24, size: 62 },
-  { id: "tauheed", kind: "member", label: "Tauheed", sub: "Industry Outreach", photo: "/team/tauheed.jpeg", objectPosition: "center 25%", color: C.member, x: 24, y: 76, size: 62, mobileHidden: true },
+  { id: "kaustubh", kind: "member", label: "Kaustubh Pawar", sub: "CEO", photo: "/team/kaustubh-pawar.jpg", objectPosition: "center 20%", color: C.member, x: 24, y: 76, size: 68 },
   { id: "omkar", kind: "member", label: "Omkar Pawar", sub: "Strategic Outreach", photo: "/team/omkar-pawar.jpeg", objectPosition: "center 20%", color: C.member, x: 26, y: 24, size: 62, mobileHidden: true },
-  { id: "kaustubh", kind: "member", label: "Kaustubh Pawar", sub: "CEO", photo: "/team/kaustubh-pawar.jpg", objectPosition: "center 20%", color: C.member, x: 60, y: 68, size: 68, mobileHidden: true },
 ];
 
 const LINKS: [string, string][] = [
@@ -80,14 +79,12 @@ const LINKS: [string, string][] = [
   ["hub", "mayur"],
   ["students", "kanchan"],
   ["students", "omkar"],
-  ["mentors", "tauheed"],
   ["mentors", "kanchan"],
   ["colleges", "omkar"],
   ["careers", "mayur"],
-  ["careers", "tauheed"],
   ["kanchan", "mayur"],
   ["hub", "kaustubh"],
-  ["kaustubh", "mayur"],
+  ["careers", "kaustubh"],
 ];
 
 interface Link {
