@@ -16,7 +16,13 @@ import type { TeamMember } from "@/types";
  * Real member stories — text is drawn from each person's real bio (no invented
  * quotes). Surfaces members whose source bios read as mission statements.
  */
-const STORY_IDS = ["mayur-patil", "tauheed", "pooja-kolekar"];
+const STORY_IDS = ["mayur-patil", "kanchan-patil", "kaustubh-pawar"];
+
+/**
+ * Role label shown on the Community story card only (does NOT change the
+ * member's canonical role in the team data used elsewhere).
+ */
+const ROLE_OVERRIDE: Record<string, string> = { "kaustubh-pawar": "CEO" };
 
 function StoryCard({ member, index }: { member: TeamMember; index: number }) {
   const flip = index % 2 === 1;
@@ -66,7 +72,7 @@ function StoryCard({ member, index }: { member: TeamMember; index: number }) {
             <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-glow" />
             <div>
               <p className="font-bold text-accent">{member.name}</p>
-              <p className="text-sm text-muted">{member.role}</p>
+              <p className="text-sm text-muted">{ROLE_OVERRIDE[member.id] ?? member.role}</p>
             </div>
           </div>
           {member.linkedin && (

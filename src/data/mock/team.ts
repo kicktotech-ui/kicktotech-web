@@ -38,6 +38,14 @@ export const team: TeamMember[] = [
     bio: "Ms. Kanchan Patil serves as the Managing Director at Kick To Tech Community, where she plays a vital role in coordinating operations and keeping initiatives running smoothly.",
   },
   {
+    id: "pranjali",
+    name: "Pranjali",
+    role: "Event Management Head",
+    photo: "/team/pranjali.jpeg",
+    objectPosition: "center 20%",
+    bio: "Pranjali serves as the Event Management Head at Kick To Tech Community, where she plans and coordinates workshops, hackathons, and community events — ensuring every initiative runs smoothly from concept to execution.",
+  },
+  {
     id: "tauheed",
     name: "Tauheed",
     role: "Industry Outreach Executive",
