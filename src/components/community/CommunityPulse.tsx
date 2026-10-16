@@ -26,7 +26,7 @@ type Node = {
 const nodes: Node[] = [
   { name: "Mayur Patil", role: "Founder", photo: "/team/mayur-patil.png", pos: "center 20%", x: 50, y: 48, size: 108 },
   { name: "Kaustubh Pawar", role: "Co-Founder", photo: "/team/kaustubh-pawar.jpg", pos: "center 25%", x: 22, y: 28, size: 76 },
-  { name: "Kanchan Patil", role: "Management Head", photo: "/team/kanchan-patil.jpg", pos: "center 30%", x: 80, y: 26, size: 72 },
+  { name: "Kanchan Patil", role: "Managing Director", photo: "/team/kanchan-patil.jpg", pos: "center 30%", x: 80, y: 26, size: 72 },
   { name: "Omkar Pawar", role: "Strategic Outreach", photo: "/team/omkar-pawar.jpeg", pos: "center 20%", x: 16, y: 68, size: 70 },
   { name: "Tauheed", role: "Industry Outreach", photo: "/team/tauheed.jpeg", pos: "center 25%", x: 82, y: 70, size: 74 },
   { name: "Luv Parab", role: "Graphics Lead", photo: "/team/luv-parab.png", pos: "center 20%", x: 44, y: 84, size: 62 },

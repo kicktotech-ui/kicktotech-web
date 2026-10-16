@@ -66,7 +66,7 @@ const NODES: NetNode[] = [
   { id: "colleges", kind: "category", label: "Colleges", sub: "Partners", Icon: Building2, color: C.college, x: 12, y: 50, size: 54, labelPos: "bottom" },
 
   { id: "mayur", kind: "member", label: "Mayur Patil", sub: "Founder", photo: "/team/mayur-patil.png", objectPosition: "center 20%", color: C.member, x: 76, y: 76, size: 78 },
-  { id: "kanchan", kind: "member", label: "Kanchan Patil", sub: "Management Head", photo: "/team/kanchan-patil.jpg", objectPosition: "center 30%", color: C.member, x: 74, y: 24, size: 62 },
+  { id: "kanchan", kind: "member", label: "Kanchan Patil", sub: "Managing Director", photo: "/team/kanchan-patil.jpg", objectPosition: "center 30%", color: C.member, x: 74, y: 24, size: 62 },
   { id: "tauheed", kind: "member", label: "Tauheed", sub: "Industry Outreach", photo: "/team/tauheed.jpeg", objectPosition: "center 25%", color: C.member, x: 24, y: 76, size: 62, mobileHidden: true },
   { id: "omkar", kind: "member", label: "Omkar Pawar", sub: "Strategic Outreach", photo: "/team/omkar-pawar.jpeg", objectPosition: "center 20%", color: C.member, x: 26, y: 24, size: 62, mobileHidden: true },
 ];

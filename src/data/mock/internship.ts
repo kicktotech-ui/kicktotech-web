@@ -31,7 +31,7 @@ export const internshipDomains: InternshipDomain[] = [
 export const internshipProgram: InternshipProgram = {
   domains: internshipDomains,
   priceRupees: 449,
-  durationLabel: "5 Weeks (18 May 2026 - 21 June 2026)",
+  durationLabel: "5 Weeks",
   seatsLabel: "Limited Seats Available",
   perks: [
     "Real-world project work",

@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 };
 
 const heroStats = [
-  { Icon: Clock, value: "5 Weeks", label: "18 May – 21 Jun 2026" },
+  { Icon: Clock, value: "5 Weeks", label: "Duration" },
   { Icon: Layers, value: "2 Tracks", label: "Mentored domains" },
   { Icon: BadgeCheck, value: formatINR(internshipProgram.priceRupees), label: "Program fee" },
   { Icon: ShieldCheck, value: "Verifiable", label: "Certificate" },

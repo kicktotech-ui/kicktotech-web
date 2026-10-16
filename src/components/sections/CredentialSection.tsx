@@ -20,7 +20,6 @@ const meta = [
   { label: "Certificate ID", value: "KTT-2026-XXXX", mono: true },
   { label: "Program", value: "Internship" },
   { label: "Duration", value: "5 Weeks" },
-  { label: "Issued", value: "21 Jun 2026" },
 ];
 
 const features = [
@@ -158,7 +157,7 @@ export function CredentialSection() {
                 <motion.div variants={item} className="mt-7">
                   <p className="text-[11px] uppercase tracking-[0.35em] text-muted">Certificate of Completion</p>
                   <h3 className="mt-2 text-2xl font-extrabold leading-tight sm:text-3xl">Kick To Tech Internship</h3>
-                  <p className="mt-1.5 text-sm text-muted">5 Weeks · 18 May 2026 — 21 June 2026</p>
+                  <p className="mt-1.5 text-sm text-muted">5 Weeks</p>
                 </motion.div>
 
                 {/* recipient */}

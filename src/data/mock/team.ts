@@ -38,12 +38,12 @@ export const team: TeamMember[] = [
   {
     id: "kanchan-patil",
     name: "Kanchan Patil",
-    role: "Management Head",
+    role: "Managing Director",
     featured: true,
     photo: "/team/kanchan-patil.jpg",
     objectPosition: "center 20%",
     linkedin: "https://www.linkedin.com/in/kanchan-patil-6a459732b/",
-    bio: "Ms. Kanchan Patil serves as the Management Head at Kick To Tech Community, where she plays a vital role in coordinating operations and keeping initiatives running smoothly.",
+    bio: "Ms. Kanchan Patil serves as the Managing Director at Kick To Tech Community, where she plays a vital role in coordinating operations and keeping initiatives running smoothly.",
   },
   {
     id: "kalpak-narkhede",
