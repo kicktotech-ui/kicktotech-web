@@ -1,6 +1,5 @@
 import { Brain, Coffee, ShieldCheck, BarChart3, type LucideIcon } from "lucide-react";
 import type { InternshipDomain } from "@/types";
-import { Avatar } from "@/components/ui/Avatar";
 import { cn } from "@/lib/utils";
 
 const ICONS: Record<string, LucideIcon> = {
@@ -40,19 +39,11 @@ export function DomainCard({
           </span>
         ))}
       </div>
-      {domain.mentor && (
-        <div className="mt-auto flex items-center gap-2.5 border-t border-line pt-4">
-          <Avatar name={domain.mentor} src={domain.mentorImage} size={32} rounded="full" />
-          <span className="text-xs text-muted">
-            Mentor · <span className="text-primary-foreground/80">{domain.mentor}</span>
-          </span>
-        </div>
-      )}
     </>
   );
 
   const base = cn(
-    "flex h-full flex-col rounded-3xl border bg-surface p-7 text-left transition-all duration-300",
+    "h-full rounded-3xl border bg-surface p-7 text-left transition-all duration-300",
     selected ? "border-accent shadow-glow" : "border-line",
     interactive && "hover:-translate-y-1.5 hover:border-accent/50",
   );

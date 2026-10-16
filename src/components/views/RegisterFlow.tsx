@@ -196,7 +196,7 @@ export function RegisterFlow() {
                       ["Name", personal.name], ["Email", personal.email], ["Phone", personal.phone],
                       ["PRN", academic.prn], ["College", academic.college], ["School", academic.schoolName],
                       ["Course", academic.course], ["Division", academic.division], ["Year of study", academic.year],
-                      ["Internship track", domain?.title ?? "-"], ["Mentor", domain?.mentor ?? "-"],
+                      ["Internship track", domain?.title ?? "-"],
                       ["Processing fee", formatINR(internshipProgram.priceRupees)],
                     ].map(([k, v]) => (
                       <div key={k} className="flex justify-between gap-4 p-4 text-sm"><dt className="text-muted">{k}</dt><dd className="font-medium">{v}</dd></div>

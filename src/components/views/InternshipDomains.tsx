@@ -4,7 +4,6 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Brain, Coffee, ShieldCheck, BarChart3, ArrowRight, Check, Clock, BadgeCheck, type LucideIcon } from "lucide-react";
 import type { InternshipDomain } from "@/types";
-import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { internshipProgram } from "@/data/mock/internship";
 import { formatINR } from "@/lib/utils";
@@ -127,16 +126,7 @@ export function InternshipDomains({ domains }: { domains: InternshipDomain[] }) 
               </div>
             </div>
 
-            <div className="mt-8 flex flex-col items-start justify-between gap-5 border-t border-line pt-6 sm:flex-row sm:items-center">
-              {active.mentor && (
-                <div className="flex items-center gap-3">
-                  <Avatar name={active.mentor} src={active.mentorImage} size={44} rounded="full" />
-                  <div>
-                    <p className="text-xs text-muted">Your mentor</p>
-                    <p className="font-semibold">{active.mentor}</p>
-                  </div>
-                </div>
-              )}
+            <div className="mt-8 flex justify-end border-t border-line pt-6">
               <Button href={`/internship/register?domain=${active.id}`} size="lg">
                 Choose this track <ArrowRight className="h-4 w-4" />
               </Button>

@@ -15,7 +15,7 @@ export const siteConfig = {
     "Pune's student tech community building the bridge between education and employability through workshops, hackathons, mentorship, and industry-grade internships.",
   tagline: "Building Student Talent Infrastructure",
   founderQuote: "Building the bridge between education and employability.",
-  credentials: ["MSME Registered", "MoU with JSPM University", "1000+ Student Network"],
+  credentials: ["MSME Registered", "MoU with JSPM University", "1000+ Student Network", "450+ Internships Completed"],
   contact: {
     email: "hello@kicktotech.in",
     internshipEmail: "internships@kicktotech.in",
