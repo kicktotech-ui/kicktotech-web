@@ -6,6 +6,7 @@ const routes = [
   "",
   "/about",
   "/events",
+  "/hackathon",
   "/community",
   "/team",
   "/gallery",

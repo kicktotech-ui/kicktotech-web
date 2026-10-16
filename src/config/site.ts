@@ -40,6 +40,7 @@ export const mainNav = [
   { label: "Home", href: "/" },
   { label: "About Us", href: "/about" },
   { label: "Events", href: "/events" },
+  { label: "Hackathon", href: "/hackathon" },
   { label: "Community", href: "/community" },
   { label: "Team", href: "/team" },
   { label: "Gallery", href: "/gallery" },
