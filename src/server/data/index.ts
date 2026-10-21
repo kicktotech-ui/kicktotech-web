@@ -128,6 +128,8 @@ export interface ApplicationRecord {
   verifiedBy?: string;
   verifiedAt?: string;
   certificateId?: string;
+  /** ISO timestamp set when the confirmation email was successfully sent (duplicate-send guard). */
+  confirmationEmailSentAt?: string;
 }
 
 export interface AuditRecord {

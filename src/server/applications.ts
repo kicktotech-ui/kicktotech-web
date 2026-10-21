@@ -7,6 +7,8 @@ import { resolveMentorForDomain, normalizeCertificateDomain, DOMAIN_META } from 
 import type { ApplicationInput } from "./validation";
 import { sendBrevoTemplateEmail } from "./email/brevo";
 
+import { sendHackathonConfirmationEmail } from "./hackathonApplications";
+
 /*
  * Internship application service — the manual UPI + WhatsApp payment gate.
  *
@@ -113,7 +115,19 @@ export async function verifyPayment(applicationId: string, meta: { actor: string
     status: "PAYMENT_VERIFIED", verifiedBy: meta.actor, verifiedAt: new Date().toISOString(), reviewNote: undefined, updatedAt: new Date().toISOString(),
   });
   await writeAudit({ actor: meta.actor, action: "PAYMENT_VERIFIED", target: applicationId, requestId: meta.requestId });
-  return updated ?? app;
+
+  const verified = updated ?? app;
+
+  // Trigger hackathon confirmation email for Hack2Skill applications (post-verification).
+  // Fire-and-forget: admin verification succeeds regardless of email delivery.
+  // sendHackathonConfirmationEmail has its own duplicate-send guard (confirmationEmailSentAt).
+  if (verified.domain === "hack2skill") {
+    sendHackathonConfirmationEmail(verified).catch((err) => {
+      console.error(`[applications] Hack2Skill confirmation email failed for ${applicationId}:`, err);
+    });
+  }
+
+  return verified;
 }
 
 /** Admin rejects the payment proof → PAYMENT_REJECTED. */

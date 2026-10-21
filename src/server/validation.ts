@@ -70,6 +70,17 @@ export const applicationSchema = z.object({
   domain: z.enum(["python", "java"]),
 });
 
+/** Hack2Skill hackathon application. */
+export const hackathonApplicationSchema = z.object({
+  name: z.string().trim().min(2, "Enter your full name.").max(80),
+  email: emailSchema,
+  phone: z.string().trim().min(6, "Enter a valid phone number.").max(20),
+  college: z.string().trim().min(1, "Enter your college name.").max(160),
+  course: z.string().trim().max(120).optional(),
+  year: z.string().trim().max(40).optional(),
+  teamName: z.string().trim().max(120).optional(),
+});
+
 /** Mark payment proof as submitted (public, by application id). */
 export const paymentProofSchema = z.object({
   applicationId: z.string().trim().min(4).max(64),
@@ -83,6 +94,7 @@ export const applicationDecisionSchema = z.object({
 });
 
 export type ApplicationInput = z.infer<typeof applicationSchema>;
+export type HackathonApplicationInput = z.infer<typeof hackathonApplicationSchema>;
 export type PaymentProofInput = z.infer<typeof paymentProofSchema>;
 export type ApplicationDecisionInput = z.infer<typeof applicationDecisionSchema>;
 

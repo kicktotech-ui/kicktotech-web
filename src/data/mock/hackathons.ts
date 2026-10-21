@@ -26,17 +26,21 @@ export interface HackathonEntry {
   registerHref?: string;
   /** Accent color for the card's visual treatment. */
   accent: string;
+  /** Path to the event poster image (optional). */
+  poster?: string;
 }
 
 export const hackathons: HackathonEntry[] = [
   {
-    id: "edition-1",
-    title: "Hackathon · Edition I",
+    id: "hack2skill",
+    title: "Hack2Skill",
     description:
-      "Our upcoming flagship hackathon, where students form teams and turn ambitious ideas into working prototypes over an intense build sprint. Full details will be announced soon.",
-    status: "Coming Soon",
-    registrationOpen: false,
+      "Turn your ideas into real solutions. Join Hack2Skill — a high-energy hackathon where students collaborate, build, and showcase innovative prototypes.",
+    status: "Upcoming",
+    registrationOpen: true,
+    registerHref: "/hackathon/register",
     accent: "#22e3d6",
+    poster: "/events/hack2skill.png",
   },
   {
     id: "edition-2",
