@@ -37,6 +37,7 @@ export const hackathons: HackathonEntry[] = [
     description:
       "Turn your ideas into real solutions. Join Hack2Skill — a high-energy hackathon where students collaborate, build, and showcase innovative prototypes.",
     status: "Upcoming",
+    dateLabel: "28 Oct 2026",
     registrationOpen: true,
     registerHref: "/hackathon/register",
     accent: "#22e3d6",
