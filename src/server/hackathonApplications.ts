@@ -115,7 +115,71 @@ export async function submitHackathonApplication(
 }
 
 // ---------------------------------------------------------------------------
-// Brevo hackathon confirmation email (called ONLY after payment verification)
+// Hackathon proof submission (triggers confirmation email immediately)
+// ---------------------------------------------------------------------------
+
+/**
+ * Hackathon-specific proof submission handler.
+ *
+ * 1. Looks up the application by human-readable applicationId.
+ * 2. Validates it is a hack2skill application.
+ * 3. Transitions status to PAYMENT_PROOF_SUBMITTED (if not already past that).
+ * 4. Triggers the confirmation email (template #5) using the registered email.
+ *    The email is idempotent — `confirmationEmailSentAt` prevents duplicates.
+ *
+ * Returns the updated application record plus email delivery status.
+ */
+export async function submitHackathonPaymentProof(
+  applicationId: string,
+): Promise<{ application: ApplicationRecord; emailSent: boolean; emailAlreadySent: boolean }> {
+  const store = getStore();
+  const app = await store.getApplicationByAppId(applicationId);
+  if (!app) throw new AppError("NOT_FOUND", "Application not found.");
+
+  // Only handle hack2skill applications through this path.
+  if (app.domain !== HACK2SKILL_EVENT) {
+    throw new AppError("VALIDATION_ERROR", "This endpoint is only for Hack2Skill applications.");
+  }
+
+  // Transition status (idempotent — skip if already at or past PROOF_SUBMITTED).
+  let current = app;
+  if (app.status === "PAYMENT_PENDING") {
+    const updated = await store.updateApplication(app.id, {
+      status: "PAYMENT_PROOF_SUBMITTED",
+      updatedAt: new Date().toISOString(),
+    });
+    current = updated ?? app;
+  }
+  // If already PAYMENT_PROOF_SUBMITTED, PAYMENT_VERIFIED, or CERTIFICATE_ISSUED,
+  // we still attempt the email (the idempotency guard inside handles duplicates).
+
+  // Trigger confirmation email (idempotent via confirmationEmailSentAt).
+  let emailSent = false;
+  let emailAlreadySent = false;
+
+  // Re-read from store to get the latest confirmationEmailSentAt value
+  const freshApp = await store.getApplicationByAppId(applicationId);
+  const appForEmail = freshApp ?? current;
+
+  if (appForEmail.confirmationEmailSentAt) {
+    emailAlreadySent = true;
+    console.info(`[hackathon] Email already sent for ${applicationId}, skipping.`);
+  } else {
+    try {
+      const result = await sendHackathonConfirmationEmail(appForEmail);
+      emailSent = result.sent;
+    } catch (err) {
+      // Log the failure but do NOT throw — proof submission itself succeeded.
+      console.error(`[hackathon] Email trigger failed for ${applicationId}:`, err);
+      // emailSent remains false; the response will indicate the email was not sent.
+    }
+  }
+
+  return { application: current, emailSent, emailAlreadySent };
+}
+
+// ---------------------------------------------------------------------------
+// Brevo hackathon confirmation email
 // ---------------------------------------------------------------------------
 
 /**

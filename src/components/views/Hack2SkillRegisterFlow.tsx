@@ -38,6 +38,7 @@ export function Hack2SkillRegisterFlow() {
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitting, setSubmitting] = useState(false);
   const [sendingProof, setSendingProof] = useState(false);
+  const [emailSent, setEmailSent] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [applied, setApplied] = useState<ApplyResponse | null>(null);
   const [copied, setCopied] = useState(false);
@@ -99,8 +100,18 @@ export function Hack2SkillRegisterFlow() {
   const sendProof = useCallback(async () => {
     if (!applied || sendingProof) return; // prevent duplicate clicks
     setSendingProof(true);
-    // Record proof-submitted server-side (verification remains manual/admin).
-    try { await api.post("/hackathon/apply/proof", { applicationId: applied.applicationId }); } catch { /* non-blocking */ }
+    setError(null);
+    // Record proof-submitted server-side + trigger confirmation email.
+    try {
+      const res = await api.post<{ emailSent: boolean; emailAlreadySent: boolean }>(
+        "/hackathon/apply/proof",
+        { applicationId: applied.applicationId },
+      );
+      setEmailSent(res.emailSent || res.emailAlreadySent);
+    } catch (e) {
+      console.warn("[hack2skill] proof submission failed:", e);
+      setEmailSent(false);
+    }
     if (applied.whatsappUrl) window.open(applied.whatsappUrl, "_blank");
     setPhase("submitted");
     setSendingProof(false);
@@ -254,37 +265,64 @@ export function Hack2SkillRegisterFlow() {
             </div>
           )}
 
-          {/* ---- SUBMITTED (waiting for verification) ---- */}
+          {/* ---- SUBMITTED (email sent + next steps) ---- */}
           {phase === "submitted" && applied && (
             <div className="flex flex-col items-center text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/15 ring-1 ring-accent/30"><Clock className="h-8 w-8 text-accent" /></div>
-              <h2 className="mt-4 text-xl font-bold">Payment proof requested</h2>
-              <p className="mx-auto mt-2 max-w-md text-sm text-muted">
-                Send your <span className="font-medium text-primary-foreground/90">₹{applied.payment.amount} payment screenshot</span> on WhatsApp.
-                Your payment will be <span className="font-medium text-primary-foreground/90">verified before your confirmation email is sent</span>.
-              </p>
+              {emailSent ? (
+                <>
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-green-500/15 ring-1 ring-green-500/30"><BadgeCheck className="h-8 w-8 text-green-400" /></div>
+                  <h2 className="mt-4 text-xl font-bold">Registration submitted successfully!</h2>
+                  <p className="mx-auto mt-2 max-w-md text-sm text-muted">
+                    A confirmation email has been sent to <span className="font-medium text-primary-foreground/90">{personal.email}</span> with your Hack2Skill registration details and next steps.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/15 ring-1 ring-accent/30"><Clock className="h-8 w-8 text-accent" /></div>
+                  <h2 className="mt-4 text-xl font-bold">Payment proof submitted</h2>
+                  <p className="mx-auto mt-2 max-w-md text-sm text-muted">
+                    Your payment declaration has been recorded. Please also send your <span className="font-medium text-primary-foreground/90">₹{applied.payment.amount} payment screenshot</span> on WhatsApp for verification.
+                  </p>
+                </>
+              )}
 
               {/* Status lifecycle */}
               <div className="mx-auto mt-6 max-w-sm space-y-2 text-left text-xs">
                 <div className="flex items-center gap-2 rounded-lg border border-accent/20 bg-accent/5 px-3 py-2">
                   <Check className="h-3.5 w-3.5 text-accent" /> <span>Registration submitted</span>
                 </div>
-                <div className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 font-medium text-amber-300">
-                  <Clock className="h-3.5 w-3.5" /> <span>Payment pending verification</span>
+                <div className="flex items-center gap-2 rounded-lg border border-accent/20 bg-accent/5 px-3 py-2">
+                  <Check className="h-3.5 w-3.5 text-accent" /> <span>Payment declared</span>
                 </div>
-                <div className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-muted">
-                  <BadgeCheck className="h-3.5 w-3.5" /> <span>Confirmation email (sent after verification)</span>
-                </div>
+                {emailSent ? (
+                  <div className="flex items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/5 px-3 py-2 font-medium text-green-400">
+                    <BadgeCheck className="h-3.5 w-3.5" /> <span>Confirmation email sent ✓</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 font-medium text-amber-300">
+                    <Clock className="h-3.5 w-3.5" /> <span>Confirmation email could not be sent — see instructions below</span>
+                  </div>
+                )}
               </div>
 
-              {/* Hack2Skill external registration notice */}
+              {/* Hack2Skill external registration notice — always shown */}
               <div className="mx-auto mt-6 max-w-md rounded-2xl border border-accent/30 bg-accent/5 p-5 text-left">
                 <h3 className="flex items-center gap-2 text-sm font-semibold text-accent">
-                  <ExternalLink className="h-4 w-4" /> Important: Complete Hack2Skill Registration
+                  <ExternalLink className="h-4 w-4" /> Next Step: Complete Hack2Skill Registration
                 </h3>
                 <p className="mt-2 text-xs text-muted">
-                  After your payment is verified, you must also register separately on the official Hack2Skill platform to complete your hackathon participation. The link will be in your confirmation email, or visit{" "}
-                  <a href="https://hack2skill.com/" target="_blank" rel="noopener noreferrer" className="font-medium text-accent underline">hack2skill.com</a>.
+                  To complete your hackathon participation, you must register on the official Hack2Skill platform.
+                  {emailSent
+                    ? " Check your email for the direct link, or visit "
+                    : " Visit "}
+                  <a href="https://hack2skill.com/" target="_blank" rel="noopener noreferrer" className="font-medium text-accent underline">hack2skill.com</a> to register.
+                </p>
+              </div>
+
+              {/* WhatsApp reminder — payment verification is still manual */}
+              <div className="mx-auto mt-4 max-w-md rounded-2xl border border-line p-4 text-left">
+                <p className="text-xs text-muted">
+                  <span className="font-medium text-primary-foreground/90">Payment verification:</span> Your payment will be manually verified by our team. Please ensure you have sent your payment screenshot on WhatsApp.
                 </p>
               </div>
 
