@@ -12,12 +12,34 @@ export const GET = route(async (req, { requestId }) => {
   const url = new URL(req.url);
   const search = (url.searchParams.get("search") ?? "").trim().toLowerCase();
   const status = url.searchParams.get("status") ?? undefined;
+  const type = url.searchParams.get("type") ?? undefined;
   const page = Math.max(1, Number(url.searchParams.get("page") ?? 1));
   const pageSize = Math.min(200, Math.max(1, Number(url.searchParams.get("pageSize") ?? 10)));
 
   let rows = await listApplications();
+  if (type === "internship") {
+    rows = rows.filter((r) => r.domain !== "hack2skill" && r.amount !== 99);
+  } else if (type === "hackathon") {
+    rows = rows.filter((r) => r.domain === "hack2skill" || r.amount === 99);
+  }
   if (status) rows = rows.filter((r) => r.status === status);
-  if (search) rows = rows.filter((r) => [r.name, r.email, r.phone, r.applicationId, r.college ?? ""].some((v) => v.toLowerCase().includes(search)));
+  if (search) {
+    rows = rows.filter((r) =>
+      [
+        r.name,
+        r.email,
+        r.phone,
+        r.applicationId,
+        r.college ?? "",
+        r.teamName ?? "",
+        r.schoolName ?? "",
+        r.course ?? "",
+        r.year ?? "",
+        r.razorpayOrderId ?? "",
+        r.razorpayPaymentId ?? "",
+      ].some((v) => v.toLowerCase().includes(search)),
+    );
+  }
   const total = rows.length;
   const start = (page - 1) * pageSize;
   return ok({ rows: rows.slice(start, start + pageSize), total, page, pageSize }, { requestId });

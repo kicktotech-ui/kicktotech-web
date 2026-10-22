@@ -89,10 +89,10 @@ export default function ApplicationsPage() {
 
   return (
     <div>
-      <PageHeader title="Applications" subtitle="Manually verify UPI payments, then issue certificates. Payment status is backend-controlled." />
+      <PageHeader title="Applications" subtitle="Manage and verify ₹449 Internship applications, then issue certificates." />
       <DataTable
         columns={columns}
-        fetcher={(p) => adminApplicationService.query(p)}
+        fetcher={(p) => adminApplicationService.query({ ...p, type: "internship" })}
         searchPlaceholder="Search name, email, application ID..."
         refreshKey={refreshKey}
         filters={[

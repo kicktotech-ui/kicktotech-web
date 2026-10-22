@@ -59,7 +59,9 @@ export interface AdminApplication {
   email: string;
   phone: string;
   college?: string;
+  course?: string;
   year?: string;
+  teamName?: string;
   domain: string;
   mentorId?: string;
   mentorName?: string;
@@ -69,14 +71,22 @@ export interface AdminApplication {
   updatedAt: string;
   reviewNote?: string;
   certificateId?: string;
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  paymentMethod?: string;
+}
+
+export interface ApplicationQueryParams extends QueryParams {
+  type?: "internship" | "hackathon" | "all";
 }
 
 export const adminApplicationService = {
-  async query(params: QueryParams = {}): Promise<Paginated<AdminApplication>> {
+  async query(params: ApplicationQueryParams = {}): Promise<Paginated<AdminApplication>> {
     const q = new URLSearchParams();
     if (params.search) q.set("search", params.search);
     q.set("page", String(params.page ?? 1));
     q.set("pageSize", String(params.pageSize ?? 10));
+    if (params.type && params.type !== "all") q.set("type", params.type);
     const status = params.filters?.status;
     if (status) q.set("status", status);
     try {
@@ -89,6 +99,15 @@ export const adminApplicationService = {
   async decide(applicationId: string, action: "verify" | "reject", reason?: string): Promise<AdminApplication> {
     const { application } = await api.patch<{ application: AdminApplication }>("/admin/applications", { applicationId, action, reason });
     return application;
+  },
+};
+
+export const adminHackathonService = {
+  async query(params: QueryParams = {}): Promise<Paginated<AdminApplication>> {
+    return adminApplicationService.query({ ...params, type: "hackathon" });
+  },
+  async decide(applicationId: string, action: "verify" | "reject", reason?: string): Promise<AdminApplication> {
+    return adminApplicationService.decide(applicationId, action, reason);
   },
 };
 export const mentorService = apiRepository<Mentor>("mentors");

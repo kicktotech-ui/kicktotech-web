@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Activity, Users, FileText, GraduationCap, Building2, BookOpen,
   Video, CalendarCheck, CreditCard, KeyRound, Award, BadgeCheck, FileBadge, ShieldCheck,
-  Bell, Megaphone, Mail, BarChart3, HeartPulse, Settings, type LucideIcon,
+  Bell, Megaphone, Mail, BarChart3, HeartPulse, Settings, Trophy, type LucideIcon,
 } from "lucide-react";
 
 export interface NavItem { label: string; href: string; icon: LucideIcon }
@@ -27,7 +27,10 @@ export const navGroups: NavGroup[] = [
   },
   {
     label: "Programs",
-    items: [{ label: "Domains & Roadmaps", href: "/admin/domains", icon: BookOpen }],
+    items: [
+      { label: "Domains & Roadmaps", href: "/admin/domains", icon: BookOpen },
+      { label: "Hackathon Manager", href: "/admin/hackathons", icon: Trophy },
+    ],
   },
   {
     label: "Operations",
@@ -78,6 +81,7 @@ export const segmentLabels: Record<string, string> = {
   mentors: "Mentors",
   faculty: "Faculty",
   domains: "Domains & Roadmaps",
+  hackathons: "Hackathon Manager",
   sessions: "Live Sessions",
   attendance: "Attendance",
   payments: "Payments",

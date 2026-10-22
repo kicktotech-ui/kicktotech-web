@@ -109,6 +109,7 @@ export async function submitHackathonApplication(
       course: input.course,
       year: input.year,
       schoolName: input.teamName,
+      teamName: input.teamName,
       domain: HACK2SKILL_EVENT,
       amount: HACKATHON_FEE_INR,
       status: "PAYMENT_PENDING",

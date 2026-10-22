@@ -1,6 +1,7 @@
 import { uuid } from "../crypto";
 import { config } from "../config";
 import { createFirebaseStore } from "./firebase";
+import { isAdminConfigured } from "../firebase/admin";
 
 /**
  * Data layer — entity types + an ASYNC, Firestore-friendly DataStore interface.
@@ -115,6 +116,7 @@ export interface ApplicationRecord {
   course?: string;
   year?: string;
   city?: string;
+  teamName?: string;
   domain: string;
   mentorId?: string;
   mentorName?: string;
@@ -271,13 +273,15 @@ class MemoryDataStore implements DataStore {
 const globalRef = globalThis as unknown as { __kttStore?: DataStore; __kttBackend?: string };
 
 export function getStore(): DataStore {
-  if (globalRef.__kttStore && globalRef.__kttBackend === config.dataBackend) {
+  const useFirebase = config.dataBackend === "firebase" || isAdminConfigured();
+  const effectiveBackend = useFirebase ? "firebase" : "memory";
+  if (globalRef.__kttStore && globalRef.__kttBackend === effectiveBackend) {
     return globalRef.__kttStore;
   }
   // createFirebaseStore is import-safe: the firebase-admin runtime is only
   // dynamically imported inside getAdminDb() when a Firestore method is called.
-  const store: DataStore = config.dataBackend === "firebase" ? createFirebaseStore() : new MemoryDataStore();
+  const store: DataStore = useFirebase ? createFirebaseStore() : new MemoryDataStore();
   globalRef.__kttStore = store;
-  globalRef.__kttBackend = config.dataBackend;
+  globalRef.__kttBackend = effectiveBackend;
   return store;
 }
