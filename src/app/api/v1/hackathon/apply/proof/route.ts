@@ -8,22 +8,19 @@ export const dynamic = "force-dynamic";
 /**
  * Public: the student confirms they've paid and submits proof.
  *
- * For Hack2Skill registrations this also triggers the confirmation email
- * (Brevo template #5) immediately — the student does not need to wait for
- * admin payment verification to receive Hack2Skill registration instructions.
+ * This transitions the application to PAYMENT_PROOF_SUBMITTED. It does NOT
+ * trigger the confirmation email — that is sent only after an admin verifies
+ * the actual payment via the admin applications endpoint.
  *
- * Idempotent: duplicate clicks will not send duplicate emails (guarded by
- * confirmationEmailSentAt on the application record).
+ * Idempotent: duplicate clicks will not cause errors.
  */
 export const POST = route(async (req, { requestId }) => {
   const { applicationId } = await parseJson(req, paymentProofSchema);
-  const { application, emailSent, emailAlreadySent } = await submitHackathonPaymentProof(applicationId);
+  const { application } = await submitHackathonPaymentProof(applicationId);
   return ok(
     {
       applicationId: application.applicationId,
       status: application.status,
-      emailSent,
-      emailAlreadySent,
     },
     { requestId },
   );

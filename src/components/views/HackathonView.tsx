@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useState, useCallback } from "react";
 import Image from "next/image";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import {
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { hackathons, type HackathonEntry } from "@/data/mock/hackathons";
 import { easePremium } from "@/lib/motion";
 import { cn, formatINR } from "@/lib/utils";
+import { HackathonAuthModal } from "./HackathonAuthModal";
 
 /** Where "Join the Community" points — the real, existing community page. */
 const COMMUNITY_HREF = "/join";
@@ -21,6 +22,7 @@ const HACKATHON_FEE = 99;
 
 export function HackathonView() {
   const reduce = useReducedMotion();
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   const container: Variants = {
     hidden: {},
@@ -93,7 +95,7 @@ export function HackathonView() {
             </motion.p>
 
             <motion.div variants={item} className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <Button href="/hackathon/register" size="lg">
+              <Button size="lg" onClick={() => setAuthModalOpen(true)}>
                 Register Now — {formatINR(HACKATHON_FEE)} <ArrowRight className="h-4 w-4" />
               </Button>
               <Button size="lg" variant="outline" onClick={scrollToHackathons}>
@@ -181,7 +183,7 @@ export function HackathonView() {
                         <p className="text-3xl font-extrabold text-accent">{formatINR(HACKATHON_FEE)}</p>
                         <p className="mt-1 text-xs text-muted">Registration Fee</p>
                       </div>
-                      <Button href="/hackathon/register" size="lg" className="w-full">
+                      <Button size="lg" className="w-full" onClick={() => setAuthModalOpen(true)}>
                         Register Now <ArrowRight className="h-4 w-4" />
                       </Button>
                       <p className="text-[11px] text-muted">Limited slots • Don&apos;t miss out!</p>
@@ -321,7 +323,7 @@ export function HackathonView() {
                 Register for PromptWars × KICK To TECH now or join the community to stay updated on upcoming hackathons and events.
               </p>
               <div className="mt-7 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-                <Button href="/hackathon/register" size="lg">
+                <Button size="lg" onClick={() => setAuthModalOpen(true)}>
                   Register for PromptWars <ArrowRight className="h-4 w-4" />
                 </Button>
                 <Button href={COMMUNITY_HREF} variant="outline" size="lg">
@@ -332,6 +334,8 @@ export function HackathonView() {
           </div>
         </Container>
       </Section>
+      {/* Auth Modal */}
+      <HackathonAuthModal open={authModalOpen} onClose={() => setAuthModalOpen(false)} />
     </>
   );
 }

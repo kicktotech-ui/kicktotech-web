@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Check, Loader2, ArrowRight, ArrowLeft, ShieldCheck, Copy,
-  MessageCircle, Clock, BadgeCheck, ExternalLink,
+  MessageCircle, Clock, BadgeCheck, ExternalLink, CheckCircle2,
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { Container, Section } from "@/components/ui";
@@ -38,7 +38,6 @@ export function Hack2SkillRegisterFlow() {
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitting, setSubmitting] = useState(false);
   const [sendingProof, setSendingProof] = useState(false);
-  const [emailSent, setEmailSent] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [applied, setApplied] = useState<ApplyResponse | null>(null);
   const [copied, setCopied] = useState(false);
@@ -101,16 +100,14 @@ export function Hack2SkillRegisterFlow() {
     if (!applied || sendingProof) return; // prevent duplicate clicks
     setSendingProof(true);
     setError(null);
-    // Record proof-submitted server-side + trigger confirmation email.
+    // Record proof-submitted server-side (no email is triggered here).
     try {
-      const res = await api.post<{ emailSent: boolean; emailAlreadySent: boolean }>(
+      await api.post<{ status: string }>(
         "/hackathon/apply/proof",
         { applicationId: applied.applicationId },
       );
-      setEmailSent(res.emailSent || res.emailAlreadySent);
     } catch (e) {
       console.warn("[hack2skill] proof submission failed:", e);
-      setEmailSent(false);
     }
     if (applied.whatsappUrl) window.open(applied.whatsappUrl, "_blank");
     setPhase("submitted");
@@ -265,26 +262,23 @@ export function Hack2SkillRegisterFlow() {
             </div>
           )}
 
-          {/* ---- SUBMITTED (email sent + next steps) ---- */}
+          {/* ---- SUBMITTED (awaiting admin verification) ---- */}
           {phase === "submitted" && applied && (
             <div className="flex flex-col items-center text-center">
-              {emailSent ? (
-                <>
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-green-500/15 ring-1 ring-green-500/30"><BadgeCheck className="h-8 w-8 text-green-400" /></div>
-                  <h2 className="mt-4 text-xl font-bold">Registration submitted successfully!</h2>
-                  <p className="mx-auto mt-2 max-w-md text-sm text-muted">
-                    A confirmation email has been sent to <span className="font-medium text-primary-foreground/90">{personal.email}</span> with your PromptWars × KICK To TECH registration details and next steps.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/15 ring-1 ring-accent/30"><Clock className="h-8 w-8 text-accent" /></div>
-                  <h2 className="mt-4 text-xl font-bold">Payment proof submitted</h2>
-                  <p className="mx-auto mt-2 max-w-md text-sm text-muted">
-                    Your payment declaration has been recorded. Please also send your <span className="font-medium text-primary-foreground/90">₹{applied.payment.amount} payment screenshot</span> on WhatsApp for verification.
-                  </p>
-                </>
-              )}
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 200, damping: 14, delay: 0.1 }}
+                className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/15 ring-1 ring-accent/30"
+              >
+                <CheckCircle2 className="h-8 w-8 text-accent" />
+              </motion.div>
+              <h2 className="mt-4 text-xl font-bold">Payment proof submitted!</h2>
+              <p className="mx-auto mt-2 max-w-md text-sm text-muted">
+                Your payment declaration has been recorded. Please ensure you have sent your{" "}
+                <span className="font-medium text-primary-foreground/90">₹{applied.payment.amount} payment screenshot</span>{" "}
+                on WhatsApp for verification.
+              </p>
 
               {/* Status lifecycle */}
               <div className="mx-auto mt-6 max-w-sm space-y-2 text-left text-xs">
@@ -292,37 +286,35 @@ export function Hack2SkillRegisterFlow() {
                   <Check className="h-3.5 w-3.5 text-accent" /> <span>Registration submitted</span>
                 </div>
                 <div className="flex items-center gap-2 rounded-lg border border-accent/20 bg-accent/5 px-3 py-2">
-                  <Check className="h-3.5 w-3.5 text-accent" /> <span>Payment declared</span>
+                  <Check className="h-3.5 w-3.5 text-accent" /> <span>Payment proof declared</span>
                 </div>
-                {emailSent ? (
-                  <div className="flex items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/5 px-3 py-2 font-medium text-green-400">
-                    <BadgeCheck className="h-3.5 w-3.5" /> <span>Confirmation email sent ✓</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 font-medium text-amber-300">
-                    <Clock className="h-3.5 w-3.5" /> <span>Confirmation email could not be sent — see instructions below</span>
-                  </div>
-                )}
+                <div className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 font-medium text-amber-300">
+                  <Clock className="h-3.5 w-3.5" /> <span>Awaiting admin payment verification</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-muted">
+                  <BadgeCheck className="h-3.5 w-3.5" /> <span>Confirmation email will be sent after verification</span>
+                </div>
               </div>
 
-              {/* Hack2Skill external registration notice — always shown */}
-              <div className="mx-auto mt-6 max-w-md rounded-2xl border border-accent/30 bg-accent/5 p-5 text-left">
-                <h3 className="flex items-center gap-2 text-sm font-semibold text-accent">
-                  <ExternalLink className="h-4 w-4" /> Next Step: Complete PromptWars Registration
-                </h3>
-                <p className="mt-2 text-xs text-muted">
-                  To complete your hackathon participation, you must register on the official PromptWars platform.
-                  {emailSent
-                    ? " Check your email for the direct link, or visit "
-                    : " Visit "}
-                  <a href="https://hack2skill.com/event/promptwars-x-kicktotech-promptwars-2026?utm_source=hack2skill&utm_medium=homepage" target="_blank" rel="noopener noreferrer" className="font-medium text-accent underline">PromptWars registration page</a> to register.
+              {/* Payment verification notice */}
+              <div className="mx-auto mt-6 max-w-md rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 text-left">
+                <p className="text-xs text-amber-300">
+                  <span className="font-medium text-amber-200">⚠️ Important:</span>{" "}
+                  Your payment will be manually verified by our team against the actual receiving account.
+                  Your confirmation email (with hackathon details and next steps) will be sent only after
+                  your payment has been verified by an admin.
                 </p>
               </div>
 
-              {/* WhatsApp reminder — payment verification is still manual */}
-              <div className="mx-auto mt-4 max-w-md rounded-2xl border border-line p-4 text-left">
-                <p className="text-xs text-muted">
-                  <span className="font-medium text-primary-foreground/90">Payment verification:</span> Your payment will be manually verified by our team. Please ensure you have sent your payment screenshot on WhatsApp.
+              {/* PromptWars external registration notice — always shown */}
+              <div className="mx-auto mt-4 max-w-md rounded-2xl border border-accent/30 bg-accent/5 p-5 text-left">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-accent">
+                  <ExternalLink className="h-4 w-4" /> Next Step: Complete Hack2Skill Registration
+                </h3>
+                <p className="mt-2 text-xs text-muted">
+                  To complete your hackathon participation, you must also register on the official PromptWars platform.
+                  Visit the{" "}
+                  <a href="https://hack2skill.com/event/promptwars-x-kicktotech-promptwars-2026?utm_source=hack2skill&utm_medium=homepage" target="_blank" rel="noopener noreferrer" className="font-medium text-accent underline">PromptWars registration page</a> to register.
                 </p>
               </div>
 
