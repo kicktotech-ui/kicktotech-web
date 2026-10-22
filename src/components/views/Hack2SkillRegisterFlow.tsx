@@ -636,23 +636,66 @@ export function Hack2SkillRegisterFlow() {
                 )}
               </div>
 
-              {/* PromptWars external registration notice — next step */}
-              <div className="mx-auto mt-6 max-w-md rounded-2xl border border-accent/30 bg-accent/5 p-5 text-left">
-                <h3 className="flex items-center gap-2 text-sm font-semibold text-accent">
-                  <ExternalLink className="h-4 w-4" /> Next Step: Complete Hack2Skill Platform Registration
-                </h3>
-                <p className="mt-2 text-xs text-muted">
-                  To complete your official hackathon participation, register on the Hack2Skill PromptWars platform:
+              {/* PromptWars external registration notice — upgraded Next Step box */}
+              <div className="mx-auto mt-8 w-full max-w-2xl rounded-2xl border-2 border-accent/50 bg-gradient-to-b from-accent/[0.12] via-accent/[0.06] to-surface/80 p-6 sm:p-8 text-left shadow-2xl shadow-accent/10 backdrop-blur-md">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <h3 className="flex items-center gap-2.5 text-lg sm:text-xl font-bold text-accent">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/20 text-accent ring-1 ring-accent/40">
+                      <ExternalLink className="h-5 w-5" />
+                    </span>
+                    Next Step: Complete Hack2Skill Platform Registration
+                  </h3>
+                  <span className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-full bg-accent/20 px-3 py-1 text-xs font-bold text-accent ring-1 ring-accent/40">
+                    Mandatory Step
+                  </span>
+                </div>
+
+                <p className="mt-4 text-sm sm:text-base leading-relaxed text-primary-foreground/90 font-medium">
+                  Your payment of <span className="text-accent font-semibold">{formatINR(HACKATHON_FEE)}</span> is verified! To receive problem statements, access project submission, and get your team dashboard, complete this final step on the Hack2Skill platform:
                 </p>
-                <div className="mt-3">
+
+                {/* Steps guidance */}
+                <div className="mt-5 space-y-3 rounded-xl border border-line bg-surface/60 p-4 sm:p-5">
+                  <div className="flex items-start gap-3 text-xs sm:text-sm text-primary-foreground/90">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/20 font-bold text-accent">
+                      1
+                    </span>
+                    <span>
+                      Click the <strong className="text-accent font-semibold">Open PromptWars Registration Page</strong> button below.
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-3 text-xs sm:text-sm text-primary-foreground/90">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/20 font-bold text-accent">
+                      2
+                    </span>
+                    <span>
+                      Sign in or create your account using <strong className="text-primary-foreground font-semibold">{user?.email || personal.email}</strong>.
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-3 text-xs sm:text-sm text-primary-foreground/90">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 font-bold text-emerald-400">
+                      ✓
+                    </span>
+                    <span>
+                      Your ₹99 registration fee is already verified with KICK To TECH. Join the event and form your team!
+                    </span>
+                  </div>
+                </div>
+
+                {/* Prominent Large Call To Action Button */}
+                <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-4 border-t border-accent/20">
                   <a
                     href="https://hack2skill.com/event/promptwars-x-kicktotech-promptwars-2026?utm_source=hack2skill&utm_medium=homepage"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent underline hover:text-accent/80"
+                    className="group inline-flex w-full sm:w-auto items-center justify-center gap-3 rounded-xl bg-accent px-8 py-4 text-base sm:text-lg font-bold text-accent-foreground shadow-lg shadow-accent/25 transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(34,227,214,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                   >
-                    Open PromptWars Registration Page <ArrowRight className="h-3 w-3" />
+                    <span>Open PromptWars Registration Page</span>
+                    <ArrowRight className="h-5 w-5 transition-transform duration-300 group-hover:translate-x-1" />
                   </a>
+                  <p className="text-xs text-muted">
+                    Opens official portal in a new tab • Takes ~1 min
+                  </p>
                 </div>
               </div>
 
