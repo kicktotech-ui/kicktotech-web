@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import {
   Sparkles, Trophy, ArrowRight, Users, CalendarDays, MapPin, Target,
-  Lock, Rocket, ChevronRight, Zap, AlertTriangle, ExternalLink, Bell,
+  Lock, Rocket, ChevronRight, Zap,
   type LucideIcon,
 } from "lucide-react";
 import { Container, Section, Badge, SectionHeading } from "@/components/ui";
@@ -199,92 +199,6 @@ export function HackathonView() {
                         Register Now <ArrowRight className="h-4 w-4" />
                       </Button>
                       <p className="text-[11px] text-muted">Limited slots • Don&apos;t miss out!</p>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-
-              {/* ---- Hack2Skill External Registration Notice ---- */}
-              <motion.div
-                variants={item}
-                className="relative mt-8 overflow-hidden rounded-3xl"
-              >
-                {/* Animated glowing border */}
-                <div
-                  aria-hidden
-                  className={cn(
-                    "pointer-events-none absolute -inset-px rounded-3xl",
-                    !reduce && "animate-[glow-border_4s_ease-in-out_infinite]",
-                  )}
-                  style={{
-                    background: reduce
-                      ? "linear-gradient(135deg, rgba(34,227,214,0.35), rgba(59,130,246,0.25))"
-                      : undefined,
-                  }}
-                />
-                {/* Keyframe injected via style tag — scoped, lightweight */}
-                {!reduce && (
-                  <style>{`
-                    @keyframes glow-border {
-                      0%, 100% { background: linear-gradient(135deg, rgba(34,227,214,0.35), rgba(59,130,246,0.18)); }
-                      50% { background: linear-gradient(135deg, rgba(59,130,246,0.25), rgba(34,227,214,0.45)); }
-                    }
-                    @keyframes bell-ring {
-                      0%, 80%, 100% { transform: rotate(0deg); }
-                      10% { transform: rotate(12deg); }
-                      20% { transform: rotate(-10deg); }
-                      30% { transform: rotate(8deg); }
-                      40% { transform: rotate(-6deg); }
-                      50% { transform: rotate(3deg); }
-                      60% { transform: rotate(0deg); }
-                    }
-                  `}</style>
-                )}
-
-                <div className="relative rounded-3xl border border-accent/20 bg-gradient-to-br from-ink-800/90 via-surface to-ink-800/80 p-6 sm:p-8">
-                  {/* Ambient glow */}
-                  <div aria-hidden className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-accent/8 blur-3xl" />
-                  <div aria-hidden className="pointer-events-none absolute -left-8 bottom-0 h-32 w-32 rounded-full bg-electric/6 blur-3xl" />
-
-                  <div className="relative flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-6">
-                    {/* Animated bell icon */}
-                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-amber-500/15 ring-1 ring-amber-500/30">
-                      <Bell
-                        className="h-6 w-6 text-amber-400"
-                        style={!reduce ? { animation: "bell-ring 3s ease-in-out infinite" } : undefined}
-                      />
-                    </div>
-
-                    <div className="flex-1">
-                      <h3 className="flex items-center gap-2 text-lg font-bold sm:text-xl">
-                        <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-400" />
-                        <span>Complete Your PromptWars Registration!</span>
-                      </h3>
-
-                      <p className="mt-3 text-sm leading-relaxed text-muted sm:text-[15px]">
-                        Your{" "}
-                        <span className="font-semibold text-accent">
-                          {formatINR(HACKATHON_FEE)} registration with KICK TO TECH is just the first step
-                        </span>
-                        . After completing your registration and payment verification, you{" "}
-                        <span className="font-semibold text-accent">
-                          MUST register separately on the official PromptWars platform
-                        </span>{" "}
-                        to complete your hackathon participation.
-                      </p>
-
-                      <div className="mt-5">
-                        <a
-                          href="https://hack2skill.com/event/promptwars-x-kicktotech-promptwars-2026?utm_source=hack2skill&utm_medium=homepage"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="group/btn inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-accent-foreground transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0_24px_rgba(34,227,214,0.3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
-                        >
-                          Complete PromptWars Registration
-                          <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover/btn:translate-x-1" />
-                          <ExternalLink className="h-3.5 w-3.5 opacity-60" />
-                        </a>
-                      </div>
                     </div>
                   </div>
                 </div>
