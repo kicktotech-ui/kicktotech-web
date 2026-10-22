@@ -27,18 +27,27 @@ export async function createSession(type: AccountType, user: UserRecord): Promis
   };
   await store.createSession(session);
 
-  cookies().set(cookieName(type), sign(session.id), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: config.cookieSecure,
-    path: "/",
-    maxAge: config.sessionTtlHours * 3600,
-  });
+  try {
+    cookies().set(cookieName(type), sign(session.id), {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: config.cookieSecure,
+      path: "/",
+      maxAge: config.sessionTtlHours * 3600,
+    });
+  } catch {
+    // Outside request scope (e.g. CLI / tests)
+  }
   return session;
 }
 
 export async function readSession(type: AccountType): Promise<{ session: SessionRecord; user: UserRecord } | null> {
-  const raw = cookies().get(cookieName(type))?.value;
+  let raw: string | undefined;
+  try {
+    raw = cookies().get(cookieName(type))?.value;
+  } catch {
+    return null;
+  }
   if (!raw) return null;
   const sessionId = unsign(raw);
   if (!sessionId) return null;
@@ -56,12 +65,16 @@ export async function readSession(type: AccountType): Promise<{ session: Session
 }
 
 export async function clearSession(type: AccountType): Promise<void> {
-  const raw = cookies().get(cookieName(type))?.value;
-  if (raw) {
-    const sessionId = unsign(raw);
-    if (sessionId) await getStore().deleteSession(sessionId);
+  try {
+    const raw = cookies().get(cookieName(type))?.value;
+    if (raw) {
+      const sessionId = unsign(raw);
+      if (sessionId) await getStore().deleteSession(sessionId);
+    }
+    cookies().delete(cookieName(type));
+  } catch {
+    // Outside request scope
   }
-  cookies().delete(cookieName(type));
 }
 
 /** Public-safe projection of a user (never exposes password material). */

@@ -152,34 +152,92 @@ export function createFirebaseStore(): DataStore {
   return {
     newId: () => uuid(),
 
-    // ---- users (auth profiles) — READ from real `users` ------------------
+    // ---- users (auth profiles) — READ from real `users` + WRITE namespaced `ktt_users`
     async findUserByEmail(email) {
       const db = await getAdminDb();
-      const snap = await db.collection(READ.users).where("email", "==", email).limit(1).get();
-      if (snap.empty) return null;
-      const d = snap.docs[0].data() as Doc;
-      return {
-        id: str(d.uid) || snap.docs[0].id,
-        type: str(d.role).toLowerCase() === "admin" ? "admin" : "student",
-        role: (str(d.role) || "student") as UserRecord["role"],
-        name: str(d.name), email: str(d.email), phone: d.phone ? str(d.phone) : undefined,
-        passwordSalt: "", passwordHash: "", status: "active",
-        createdAt: toIso(d.createdAt), updatedAt: toIso(d.updatedAt ?? d.createdAt),
-      };
+      const normEmail = email.trim().toLowerCase();
+
+      // 1. Check namespaced WRITE.users (where bootstrapped admins & app-registered accounts live)
+      try {
+        const kttSnap = await db.collection(WRITE.users).where("email", "==", normEmail).limit(1).get();
+        if (!kttSnap.empty) {
+          const doc = kttSnap.docs[0];
+          const d = doc.data() as UserRecord;
+          return { ...d, id: doc.id };
+        }
+      } catch (e) {
+        console.warn("[firebaseStore] findUserByEmail error in WRITE.users:", e);
+      }
+
+      // 2. Fallback to READ.users
+      try {
+        const snap = await db.collection(READ.users).where("email", "==", normEmail).limit(1).get();
+        if (!snap.empty) {
+          const doc = snap.docs[0];
+          const d = doc.data() as Doc;
+          const roleStr = str(d.role).toLowerCase();
+          const isAdmin = roleStr === "admin" || roleStr === "super_admin";
+          return {
+            id: str(d.uid) || doc.id,
+            type: isAdmin ? "admin" : "student",
+            role: (str(d.role) || (isAdmin ? "ADMIN" : "student")) as UserRecord["role"],
+            name: str(d.name) || "Administrator",
+            email: str(d.email).toLowerCase(),
+            phone: d.phone ? str(d.phone) : undefined,
+            college: d.college ? str(d.college) : undefined,
+            company: d.company ? str(d.company) : undefined,
+            passwordSalt: str(d.passwordSalt),
+            passwordHash: str(d.passwordHash),
+            status: str(d.status).toLowerCase() === "disabled" ? "disabled" : "active",
+            createdAt: toIso(d.createdAt),
+            updatedAt: toIso(d.updatedAt ?? d.createdAt),
+          };
+        }
+      } catch (e) {
+        console.warn("[firebaseStore] findUserByEmail error in READ.users:", e);
+      }
+      return null;
     },
     async getUserById(id) {
       const db = await getAdminDb();
-      const doc = await db.collection(READ.users).doc(id).get();
-      if (!doc.exists) return null;
-      const d = doc.data() as Doc;
-      return {
-        id: str(d.uid) || doc.id,
-        type: str(d.role).toLowerCase() === "admin" ? "admin" : "student",
-        role: (str(d.role) || "student") as UserRecord["role"],
-        name: str(d.name), email: str(d.email), phone: d.phone ? str(d.phone) : undefined,
-        passwordSalt: "", passwordHash: "", status: "active",
-        createdAt: toIso(d.createdAt), updatedAt: toIso(d.updatedAt ?? d.createdAt),
-      };
+      // 1. Check namespaced WRITE.users
+      try {
+        const kttDoc = await db.collection(WRITE.users).doc(id).get();
+        if (kttDoc.exists) {
+          const d = kttDoc.data() as UserRecord;
+          return { ...d, id: kttDoc.id };
+        }
+      } catch (e) {
+        console.warn("[firebaseStore] getUserById error in WRITE.users:", e);
+      }
+
+      // 2. Fallback to READ.users
+      try {
+        const doc = await db.collection(READ.users).doc(id).get();
+        if (doc.exists) {
+          const d = doc.data() as Doc;
+          const roleStr = str(d.role).toLowerCase();
+          const isAdmin = roleStr === "admin" || roleStr === "super_admin";
+          return {
+            id: str(d.uid) || doc.id,
+            type: isAdmin ? "admin" : "student",
+            role: (str(d.role) || (isAdmin ? "ADMIN" : "student")) as UserRecord["role"],
+            name: str(d.name) || "Administrator",
+            email: str(d.email).toLowerCase(),
+            phone: d.phone ? str(d.phone) : undefined,
+            college: d.college ? str(d.college) : undefined,
+            company: d.company ? str(d.company) : undefined,
+            passwordSalt: str(d.passwordSalt),
+            passwordHash: str(d.passwordHash),
+            status: str(d.status).toLowerCase() === "disabled" ? "disabled" : "active",
+            createdAt: toIso(d.createdAt),
+            updatedAt: toIso(d.updatedAt ?? d.createdAt),
+          };
+        }
+      } catch (e) {
+        console.warn("[firebaseStore] getUserById error in READ.users:", e);
+      }
+      return null;
     },
     // WRITE → namespaced (never touches real `users`)
     async createUser(record) {
@@ -209,8 +267,16 @@ export function createFirebaseStore(): DataStore {
     },
     async countAdmins() {
       const db = await getAdminDb();
-      const agg = await db.collection(READ.users).where("role", "==", "admin").count().get();
-      return agg.data().count;
+      let total = 0;
+      try {
+        const kttAgg = await db.collection(WRITE.users).where("type", "==", "admin").count().get();
+        total += kttAgg.data().count;
+      } catch {}
+      try {
+        const agg = await db.collection(READ.users).where("role", "==", "admin").count().get();
+        total += agg.data().count;
+      } catch {}
+      return total;
     },
 
     // ---- sessions — WRITE namespaced -------------------------------------

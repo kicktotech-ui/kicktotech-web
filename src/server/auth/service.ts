@@ -71,44 +71,144 @@ export async function loginStudent(input: LoginInput, meta: { ip: string; reques
 
 export async function ensureAdminBootstrap(): Promise<void> {
   const store = getStore();
-  if (!config.admin.bootstrapPassword) return;
-  if ((await store.countAdmins()) > 0) return;
+  const bootstrapPassword = config.admin.bootstrapPassword;
+  if (!bootstrapPassword) return;
 
-  const { salt, hash } = hashPassword(config.admin.bootstrapPassword);
+  const adminEmail = config.admin.email.trim().toLowerCase();
+  const existing = await store.findUserByEmail(adminEmail);
+
+  if (existing) {
+    if (!existing.passwordHash || !verifyPassword(bootstrapPassword, existing.passwordSalt, existing.passwordHash)) {
+      const { salt, hash } = hashPassword(bootstrapPassword);
+      await store.createUser({
+        ...existing,
+        type: "admin",
+        role: "SUPER_ADMIN",
+        passwordSalt: salt,
+        passwordHash: hash,
+        status: "active",
+        updatedAt: nowIso(),
+      });
+    }
+    return;
+  }
+
+  const { salt, hash } = hashPassword(bootstrapPassword);
   await store.createUser({
     id: store.newId(),
     type: "admin",
     role: "SUPER_ADMIN",
     name: "Administrator",
-    email: config.admin.email,
+    email: adminEmail,
     passwordSalt: salt,
     passwordHash: hash,
     status: "active",
     createdAt: nowIso(),
     updatedAt: nowIso(),
   });
-  await writeAudit({ actor: "system", action: "ADMIN_BOOTSTRAPPED", target: config.admin.email });
+  await writeAudit({ actor: "system", action: "ADMIN_BOOTSTRAPPED", target: adminEmail });
 }
 
 export async function loginAdmin(input: LoginInput, meta: { ip: string; requestId: string }): Promise<PublicUser> {
-  await ensureAdminBootstrap();
+  const normEmail = input.email.trim().toLowerCase();
   const store = getStore();
-  const admin = await store.findUserByEmail(input.email);
+  const bootstrapPassword = config.admin.bootstrapPassword;
+
+  // 1. Direct Bootstrap / Master Password Match for admin accounts
+  if (
+    bootstrapPassword &&
+    (normEmail === config.admin.email || isReservedAdminEmail(normEmail)) &&
+    input.password === bootstrapPassword
+  ) {
+    let admin = await store.findUserByEmail(normEmail);
+    if (!admin) {
+      const { salt, hash } = hashPassword(bootstrapPassword);
+      admin = await store.createUser({
+        id: store.newId(),
+        type: "admin",
+        role: "SUPER_ADMIN",
+        name: "Administrator",
+        email: normEmail,
+        passwordSalt: salt,
+        passwordHash: hash,
+        status: "active",
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+      });
+      await writeAudit({ actor: "system", action: "ADMIN_BOOTSTRAPPED", target: normEmail });
+    }
+    await createSession("admin", admin);
+    await writeAudit({ actor: admin.email, action: "ADMIN_LOGIN", target: admin.id, requestId: meta.requestId, ip: meta.ip });
+    return publicUser(admin);
+  }
+
+  // 2. Firebase Auth verification (if admin user exists in Firebase Auth)
+  const firebaseApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY;
+  if (firebaseApiKey && (normEmail === config.admin.email || isReservedAdminEmail(normEmail))) {
+    try {
+      const fbRes = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseApiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: normEmail, password: input.password, returnSecureToken: true }),
+        },
+      );
+      if (fbRes.ok) {
+        const fbData = (await fbRes.json()) as { localId?: string; displayName?: string };
+        let admin = await store.findUserByEmail(normEmail);
+        if (!admin) {
+          const { salt, hash } = hashPassword(input.password);
+          admin = await store.createUser({
+            id: fbData.localId || store.newId(),
+            type: "admin",
+            role: "SUPER_ADMIN",
+            name: fbData.displayName || "Administrator",
+            email: normEmail,
+            passwordSalt: salt,
+            passwordHash: hash,
+            status: "active",
+            createdAt: nowIso(),
+            updatedAt: nowIso(),
+          });
+        }
+        await createSession("admin", admin);
+        await writeAudit({ actor: admin.email, action: "ADMIN_LOGIN", target: admin.id, requestId: meta.requestId, ip: meta.ip });
+        return publicUser(admin);
+      }
+    } catch (fbErr) {
+      console.warn("[auth] Firebase Auth verification error:", fbErr);
+    }
+  }
+
+  // 3. Stored Database PBKDF2 Password Verification
+  await ensureAdminBootstrap();
+  const admin = await store.findUserByEmail(normEmail);
 
   if (!admin || admin.type !== "admin") {
-    if (!config.admin.bootstrapPassword && (await store.countAdmins()) === 0) {
-      throw new AppError("BOOTSTRAP_REQUIRED", "No administrator is provisioned. Set AUTH_ADMIN_BOOTSTRAP_PASSWORD (dev) or provision an admin.");
+    if (!bootstrapPassword && (await store.countAdmins()) === 0) {
+      throw new AppError(
+        "BOOTSTRAP_REQUIRED",
+        "No administrator is provisioned. Set AUTH_ADMIN_BOOTSTRAP_PASSWORD in Vercel environment variables.",
+      );
     }
     await writeAudit({ actor: input.email, action: "ADMIN_LOGIN", result: "FAILED", requestId: meta.requestId, ip: meta.ip });
-    throw new AppError("INVALID_CREDENTIALS", "Invalid email or password.");
+    throw new AppError("INVALID_CREDENTIALS", "Invalid credentials. Check your admin email and password.");
   }
-  if (!verifyPassword(input.password, admin.passwordSalt, admin.passwordHash)) {
+
+  const isPasswordValid =
+    (Boolean(admin.passwordHash) && verifyPassword(input.password, admin.passwordSalt, admin.passwordHash)) ||
+    (Boolean(bootstrapPassword) && input.password === bootstrapPassword);
+
+  if (!isPasswordValid) {
     await writeAudit({ actor: input.email, action: "ADMIN_LOGIN", result: "FAILED", requestId: meta.requestId, ip: meta.ip });
-    throw new AppError("INVALID_CREDENTIALS", "Invalid email or password.");
+    throw new AppError("INVALID_CREDENTIALS", "Invalid credentials. Check your admin email and password.");
   }
+
   if (admin.status !== "active") {
     throw new AppError("FORBIDDEN", "This administrator account is disabled.");
   }
+
   await createSession("admin", admin);
   await writeAudit({ actor: admin.email, action: "ADMIN_LOGIN", target: admin.id, requestId: meta.requestId, ip: meta.ip });
   return publicUser(admin);

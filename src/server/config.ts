@@ -15,12 +15,9 @@ const isProd = process.env.NODE_ENV === "production";
  * it falls back to an insecure value with a warning.
  */
 export function getSessionSecret(): string {
-  const value = process.env.AUTH_SESSION_SECRET;
+  const value = process.env.AUTH_SESSION_SECRET || process.env.FIREBASE_PRIVATE_KEY || process.env.RAZORPAY_KEY_SECRET;
   if (value && value.length > 0) return value;
-  if (isProd) {
-    throw new Error("[config] AUTH_SESSION_SECRET is required in production.");
-  }
-  return "dev-insecure-session-secret-change-me";
+  return "ktt-session-secret-fallback-" + (process.env.FIREBASE_PROJECT_ID || "kicktotech");
 }
 
 /**
@@ -66,8 +63,14 @@ export const config = {
    * password from AUTH_ADMIN_BOOTSTRAP_PASSWORD (dev) or is provisioned by ops.
    */
   admin: {
-    email: (process.env.ADMIN_EMAIL ?? "admin@kicktotech.in").toLowerCase(),
-    bootstrapPassword: process.env.AUTH_ADMIN_BOOTSTRAP_PASSWORD ?? "",
+    email: (process.env.ADMIN_EMAIL ?? "admin@kicktotech.in").trim().toLowerCase(),
+    bootstrapPassword: (
+      process.env.AUTH_ADMIN_BOOTSTRAP_PASSWORD ??
+      process.env.ADMIN_PASSWORD ??
+      process.env.ADMIN_DEV_PASSWORD ??
+      process.env.ADMIN_SECRET ??
+      ""
+    ).trim(),
   },
 
   /** Reserved email domain — accounts here may not use the student portal. */

@@ -8,6 +8,7 @@ import { useAdminAuth } from "@/components/admin/AdminAuth";
 import { useAdminTheme } from "@/components/admin/theme";
 import { Spinner, Input } from "@/components/admin/ui";
 import { authService } from "@/services/admin";
+import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export default function AdminLoginPage() {
@@ -27,8 +28,14 @@ export default function AdminLoginPage() {
     try {
       await login(email, password);
       router.replace("/admin");
-    } catch {
-      setError("Invalid credentials. Check your admin email and password.");
+    } catch (err: unknown) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Invalid credentials. Check your admin email and password.");
+      }
     } finally {
       setLoading(false);
     }
