@@ -185,7 +185,7 @@ export function Hack2SkillRegisterFlow() {
                       ...(academic.course ? [["Course", academic.course]] : []),
                       ...(academic.year ? [["Year", academic.year]] : []),
                       ...(academic.teamName ? [["Team name", academic.teamName]] : []),
-                      ["Event", "Hack2Skill — KICK TO TECH Hackathon"],
+                      ["Event", "PromptWars × KICK To TECH"],
                       ["Registration fee", formatINR(HACKATHON_FEE)],
                     ].map(([k, v]) => (
                       <div key={k} className="flex justify-between gap-4 p-4 text-sm"><dt className="text-muted">{k}</dt><dd className="font-medium">{v}</dd></div>
@@ -211,7 +211,7 @@ export function Hack2SkillRegisterFlow() {
           {phase === "pay" && applied && (
             <div className="text-center">
               <h2 className="text-xl font-bold">Complete your payment</h2>
-              <p className="mt-1 text-sm text-muted">Hack2Skill Hackathon registration fee</p>
+              <p className="mt-1 text-sm text-muted">PromptWars × KICK To TECH registration fee</p>
               <p className="mt-2 text-4xl font-extrabold text-accent">{formatINR(applied.payment.amount)}</p>
               <p className="mt-4 text-sm text-muted">Scan the QR with any UPI app</p>
               {/* Display the supplied ₹99 QR image exactly as-is */}
@@ -273,7 +273,7 @@ export function Hack2SkillRegisterFlow() {
                   <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-green-500/15 ring-1 ring-green-500/30"><BadgeCheck className="h-8 w-8 text-green-400" /></div>
                   <h2 className="mt-4 text-xl font-bold">Registration submitted successfully!</h2>
                   <p className="mx-auto mt-2 max-w-md text-sm text-muted">
-                    A confirmation email has been sent to <span className="font-medium text-primary-foreground/90">{personal.email}</span> with your Hack2Skill registration details and next steps.
+                    A confirmation email has been sent to <span className="font-medium text-primary-foreground/90">{personal.email}</span> with your PromptWars × KICK To TECH registration details and next steps.
                   </p>
                 </>
               ) : (
@@ -308,14 +308,14 @@ export function Hack2SkillRegisterFlow() {
               {/* Hack2Skill external registration notice — always shown */}
               <div className="mx-auto mt-6 max-w-md rounded-2xl border border-accent/30 bg-accent/5 p-5 text-left">
                 <h3 className="flex items-center gap-2 text-sm font-semibold text-accent">
-                  <ExternalLink className="h-4 w-4" /> Next Step: Complete Hack2Skill Registration
+                  <ExternalLink className="h-4 w-4" /> Next Step: Complete PromptWars Registration
                 </h3>
                 <p className="mt-2 text-xs text-muted">
-                  To complete your hackathon participation, you must register on the official Hack2Skill platform.
+                  To complete your hackathon participation, you must register on the official PromptWars platform.
                   {emailSent
                     ? " Check your email for the direct link, or visit "
                     : " Visit "}
-                  <a href="https://hack2skill.com/" target="_blank" rel="noopener noreferrer" className="font-medium text-accent underline">hack2skill.com</a> to register.
+                  <a href="https://hack2skill.com/event/promptwars-x-kicktotech-promptwars-2026?utm_source=hack2skill&utm_medium=homepage" target="_blank" rel="noopener noreferrer" className="font-medium text-accent underline">PromptWars registration page</a> to register.
                 </p>
               </div>
 

@@ -76,7 +76,7 @@ export function HackathonView() {
                   )}
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
                 </span>
-                Registration Open — Hack2Skill
+                Registration Open — PromptWars × KICK To TECH
               </span>
             </motion.div>
 
@@ -89,7 +89,7 @@ export function HackathonView() {
 
             <motion.p variants={item} className="mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-muted">
               A new generation of builders, creators, and problem-solvers is coming together. Register for 
-              Hack2Skill and turn ambitious ideas into real projects.
+              PromptWars × KICK To TECH and turn ambitious ideas into real projects.
             </motion.p>
 
             <motion.div variants={item} className="mt-9 flex flex-col gap-3 sm:flex-row">
@@ -110,8 +110,8 @@ export function HackathonView() {
           <Container>
             <SectionHeading
               eyebrow="Featured"
-              title="Hack2Skill Hackathon"
-              description="Turn your ideas into real solutions. Collaborate, build, and showcase innovative prototypes in a high-energy hackathon."
+              title="PromptWars × KICK To TECH"
+              description="Where ideas meet AI. Imagine, innovate, and impact — build with AI-powered tools, compete for a ₹30,000 prize pool, and win internship opportunities."
             />
 
             <motion.div
@@ -128,10 +128,10 @@ export function HackathonView() {
                   <div className="relative w-full overflow-hidden">
                     <Image
                       src={hack2skill.poster}
-                      alt="Hack2Skill — A KICK TO TECH Hackathon"
+                      alt="PromptWars × KICK To TECH — Build with AI, 28 October 2026, JSPM University, Pune"
                       width={1200}
                       height={630}
-                      className="h-auto w-full object-cover"
+                      className="h-auto w-full object-contain"
                       priority
                     />
                   </div>
@@ -150,7 +150,7 @@ export function HackathonView() {
                           {formatINR(HACKATHON_FEE)} Registration Fee
                         </span>
                       </div>
-                      <h3 className="mt-4 text-2xl font-bold sm:text-3xl">Hack2Skill</h3>
+                      <h3 className="mt-4 text-2xl font-bold sm:text-3xl">PromptWars × KICK To TECH</h3>
                       <p className="mt-3 text-sm leading-relaxed text-muted sm:text-base">
                         {hack2skill.description}
                       </p>
@@ -244,7 +244,7 @@ export function HackathonView() {
                     <div className="flex-1">
                       <h3 className="flex items-center gap-2 text-lg font-bold sm:text-xl">
                         <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-400" />
-                        <span>Complete Your Hack2Skill Registration!</span>
+                        <span>Complete Your PromptWars Registration!</span>
                       </h3>
 
                       <p className="mt-3 text-sm leading-relaxed text-muted sm:text-[15px]">
@@ -254,19 +254,19 @@ export function HackathonView() {
                         </span>
                         . After completing your registration and payment verification, you{" "}
                         <span className="font-semibold text-accent">
-                          MUST register separately on the official Hack2Skill platform
+                          MUST register separately on the official PromptWars platform
                         </span>{" "}
                         to complete your hackathon participation.
                       </p>
 
                       <div className="mt-5">
                         <a
-                          href="https://hack2skill.com/"
+                          href="https://hack2skill.com/event/promptwars-x-kicktotech-promptwars-2026?utm_source=hack2skill&utm_medium=homepage"
                           target="_blank"
                           rel="noopener noreferrer"
                           className="group/btn inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-accent-foreground transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0_24px_rgba(34,227,214,0.3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
                         >
-                          Complete Hack2Skill Registration
+                          Complete PromptWars Registration
                           <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover/btn:translate-x-1" />
                           <ExternalLink className="h-3.5 w-3.5 opacity-60" />
                         </a>
@@ -318,11 +318,11 @@ export function HackathonView() {
               </span>
               <h2 className="mt-5 text-2xl font-bold sm:text-3xl">Ready to build something amazing?</h2>
               <p className="mx-auto mt-3 max-w-md text-pretty text-muted">
-                Register for Hack2Skill now or join the community to stay updated on upcoming hackathons and events.
+                Register for PromptWars × KICK To TECH now or join the community to stay updated on upcoming hackathons and events.
               </p>
               <div className="mt-7 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
                 <Button href="/hackathon/register" size="lg">
-                  Register for Hack2Skill <ArrowRight className="h-4 w-4" />
+                  Register for PromptWars <ArrowRight className="h-4 w-4" />
                 </Button>
                 <Button href={COMMUNITY_HREF} variant="outline" size="lg">
                   Join the Community <ArrowRight className="h-4 w-4" />

@@ -219,7 +219,7 @@ export async function sendHackathonConfirmationEmail(app: ApplicationRecord): Pr
       amount: app.amount ?? 99,
       teamName: app.schoolName ?? "",
       college: app.college ?? "",
-      hack2skillUrl: "https://hack2skill.com/",
+      hack2skillUrl: "https://hack2skill.com/event/promptwars-x-kicktotech-promptwars-2026?utm_source=hack2skill&utm_medium=homepage",
     },
   });
 

@@ -4,8 +4,8 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Hack2SkillRegisterFlow } from "@/components/views/Hack2SkillRegisterFlow";
 
 export const metadata: Metadata = {
-  title: "Hack2Skill Registration",
-  description: "Register for the Hack2Skill hackathon by KICK TO TECH. ₹99 registration fee.",
+  title: "PromptWars × KICK To TECH Registration",
+  description: "Register for PromptWars × KICK To TECH — Build with AI, 28 October 2026 at JSPM University, Pune. ₹99 registration fee.",
 };
 
 export default function HackathonRegisterPage() {
@@ -13,7 +13,7 @@ export default function HackathonRegisterPage() {
     <>
       <PageHeader
         eyebrow="Register"
-        title="Hack2Skill Registration"
+        title="PromptWars × KICK To TECH Registration"
         description="Complete your registration in a few quick steps and pay the ₹99 fee to secure your spot."
       />
       <Suspense fallback={null}>

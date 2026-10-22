@@ -33,15 +33,18 @@ export interface HackathonEntry {
 export const hackathons: HackathonEntry[] = [
   {
     id: "hack2skill",
-    title: "Hack2Skill",
+    title: "PromptWars × KICK To TECH",
     description:
-      "Turn your ideas into real solutions. Join Hack2Skill — a high-energy hackathon where students collaborate, build, and showcase innovative prototypes.",
+      "Where ideas meet AI. Imagine, innovate, and impact — create solutions, build with AI-powered tools, and compete for a ₹30,000 prize pool, participation certificates, goodies, and internship opportunities.",
     status: "Upcoming",
     dateLabel: "28 Oct 2026",
+    modeLabel: "Library Building, JSPM University, Pune",
+    themeLabel: "Build with AI",
+    eligibilityLabel: "Open to all students",
     registrationOpen: true,
     registerHref: "/hackathon/register",
     accent: "#22e3d6",
-    poster: "/events/hack2skill.png",
+    poster: "/events/kick2skillhack.jpeg",
   },
   {
     id: "edition-2",
