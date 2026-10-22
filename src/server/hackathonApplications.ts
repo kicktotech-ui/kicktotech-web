@@ -17,6 +17,7 @@ import {
   fetchRazorpayPayment,
   getRazorpayConfig,
 } from "./payments/razorpay";
+import { syncConfirmedHackathonParticipant } from "./integrations/googleSheets";
 
 /*
  * Hack2Skill hackathon application service — powered by Razorpay Standard Checkout.
@@ -303,6 +304,11 @@ export async function verifyHackathonPayment(
     console.error(`[hackathon] Post-checkout confirmation email failed for ${app.applicationId}:`, emailErr);
   }
 
+  // 6. Real-time sync to Google Sheet (non-blocking)
+  syncConfirmedHackathonParticipant(verifiedApp).catch((sheetErr) => {
+    console.error(`[hackathon] Google Sheet sync failed for ${app.applicationId}:`, sheetErr);
+  });
+
   return { application: verifiedApp, verified: true, duplicate: false };
 }
 
@@ -392,6 +398,11 @@ export async function handleRazorpayWebhookEvent(
     } catch (e) {
       console.error(`[webhook] Confirmation email failed for ${app.applicationId}:`, e);
     }
+
+    // Real-time sync to Google Sheet (non-blocking)
+    syncConfirmedHackathonParticipant(verifiedApp).catch((sheetErr) => {
+      console.error(`[webhook] Google Sheet sync failed for ${app.applicationId}:`, sheetErr);
+    });
 
     return { processed: true, status: "verified", applicationId: app.applicationId };
   }

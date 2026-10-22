@@ -16,12 +16,19 @@ import {
   Users,
   ShieldCheck,
   Trophy,
+  ExternalLink,
+  RefreshCw,
+  FileSpreadsheet,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1jeMYVFs4l_cx8-pkfgfSI1vUd4fYTWnwMyV0u0Ksuvw/edit?usp=sharing";
 
 export default function ConfirmedHackathonRegistrationsPage() {
   const toast = useToast();
   const [refreshKey, setRefreshKey] = useState(0);
   const [isExporting, setIsExporting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [stats, setStats] = useState({
     confirmedCount: 0,
     revenue: 0,
@@ -109,6 +116,22 @@ export default function ConfirmedHackathonRegistrationsPage() {
       toast.error("Export failed. Please try again.");
     } finally {
       setIsExporting(false);
+    }
+  }
+
+  async function handleSyncSheet() {
+    setIsSyncing(true);
+    try {
+      const res = await adminHackathonService.syncGoogleSheets();
+      if (res.success) {
+        toast.success(`Synced ${res.syncedCount} confirmed participants to Google Sheet!`);
+      } else {
+        toast.error(res.error || "Google Sheet sync failed. Set GOOGLE_SHEETS_WEBHOOK_URL.");
+      }
+    } catch (e) {
+      toast.error("Failed to sync with Google Sheet.");
+    } finally {
+      setIsSyncing(false);
     }
   }
 
@@ -210,14 +233,31 @@ export default function ConfirmedHackathonRegistrationsPage() {
         title="Confirmed Registrations"
         subtitle="Verified and paid PromptWars participants with allocated unique sequential IDs (KTT01, KTT02, ...)."
         actions={
-          <Button
-            variant="secondary"
-            disabled={isExporting}
-            onClick={handleExport}
-          >
-            <Download className="h-4 w-4" />
-            {isExporting ? "Exporting..." : "Export CSV"}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => window.open(GOOGLE_SHEET_URL, "_blank")}
+            >
+              <ExternalLink className="h-4 w-4" />
+              Open Sheet
+            </Button>
+            <Button
+              variant="info"
+              disabled={isSyncing}
+              onClick={handleSyncSheet}
+            >
+              <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
+              {isSyncing ? "Syncing..." : "Sync Google Sheet"}
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={isExporting}
+              onClick={handleExport}
+            >
+              <Download className="h-4 w-4" />
+              {isExporting ? "Exporting..." : "Export CSV"}
+            </Button>
+          </div>
         }
       />
 

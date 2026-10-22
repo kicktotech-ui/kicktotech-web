@@ -20,7 +20,12 @@ import {
   Users,
   Clock,
   Sparkles,
+  ExternalLink,
+  RefreshCw,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1jeMYVFs4l_cx8-pkfgfSI1vUd4fYTWnwMyV0u0Ksuvw/edit?usp=sharing";
 
 const STATUS_TONE: Record<AdminApplicationStatus, Tone> = {
   PAYMENT_PENDING: "neutral",
@@ -43,6 +48,7 @@ export default function HackathonManagerPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [stats, setStats] = useState({
     total: 0,
     paid: 0,
@@ -161,6 +167,22 @@ export default function HackathonManagerPage() {
       toast.error("Export failed. Please try again.");
     } finally {
       setIsExporting(false);
+    }
+  }
+
+  async function handleSyncSheet() {
+    setIsSyncing(true);
+    try {
+      const res = await adminHackathonService.syncGoogleSheets();
+      if (res.success) {
+        toast.success(`Synced ${res.syncedCount} confirmed participants to Google Sheet!`);
+      } else {
+        toast.error(res.error || "Google Sheet sync failed. Set GOOGLE_SHEETS_WEBHOOK_URL.");
+      }
+    } catch (e) {
+      toast.error("Failed to sync with Google Sheet.");
+    } finally {
+      setIsSyncing(false);
     }
   }
 
@@ -302,14 +324,31 @@ export default function HackathonManagerPage() {
         title="Hackathon Manager"
         subtitle="Track PromptWars × KICK To TECH ₹99 registrations, Razorpay transactions, and participant details."
         actions={
-          <Button
-            variant="secondary"
-            disabled={isExporting}
-            onClick={handleExport}
-          >
-            <Download className="h-4 w-4" />
-            {isExporting ? "Exporting..." : "Export CSV"}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => window.open(GOOGLE_SHEET_URL, "_blank")}
+            >
+              <ExternalLink className="h-4 w-4" />
+              Open Sheet
+            </Button>
+            <Button
+              variant="info"
+              disabled={isSyncing}
+              onClick={handleSyncSheet}
+            >
+              <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
+              {isSyncing ? "Syncing..." : "Sync Google Sheet"}
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={isExporting}
+              onClick={handleExport}
+            >
+              <Download className="h-4 w-4" />
+              {isExporting ? "Exporting..." : "Export CSV"}
+            </Button>
+          </div>
         }
       />
 

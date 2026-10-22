@@ -1,4 +1,4 @@
-import { getStore, type ApplicationRecord } from "./data";
+import { getStore, isHackathonRecord, type ApplicationRecord } from "./data";
 import { applicationId as makeAppId } from "./crypto";
 import { writeAudit } from "./audit";
 import { AppError } from "./http";
@@ -6,8 +6,8 @@ import { getPaymentConfig, publicPaymentInfo, buildWhatsappUrl, type PublicPayme
 import { resolveMentorForDomain, normalizeCertificateDomain, DOMAIN_META } from "@/lib/certificates/mentors";
 import type { ApplicationInput } from "./validation";
 import { sendBrevoTemplateEmail } from "./email/brevo";
-
 import { sendHackathonConfirmationEmail } from "./hackathonApplications";
+import { syncConfirmedHackathonParticipant } from "./integrations/googleSheets";
 
 /*
  * Internship application service — the manual UPI + WhatsApp payment gate.
@@ -118,12 +118,14 @@ export async function verifyPayment(applicationId: string, meta: { actor: string
 
   const verified = updated ?? app;
 
-  // Trigger hackathon confirmation email for Hack2Skill applications (post-verification).
-  // Fire-and-forget: admin verification succeeds regardless of email delivery.
-  // sendHackathonConfirmationEmail has its own duplicate-send guard (confirmationEmailSentAt).
-  if (verified.domain === "hack2skill") {
+  // Trigger hackathon confirmation email & Google Sheet sync for Hack2Skill applications (post-verification).
+  // Fire-and-forget: admin verification succeeds regardless of email/sheet delivery.
+  if (verified.domain === "hack2skill" || isHackathonRecord(verified as unknown as Record<string, unknown>)) {
     sendHackathonConfirmationEmail(verified).catch((err) => {
       console.error(`[applications] Hack2Skill confirmation email failed for ${applicationId}:`, err);
+    });
+    syncConfirmedHackathonParticipant(verified).catch((err) => {
+      console.error(`[applications] Google Sheet sync failed for ${applicationId}:`, err);
     });
   }
 

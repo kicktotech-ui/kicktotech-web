@@ -105,6 +105,23 @@ export const adminApplicationService = {
   },
 };
 
+export interface GoogleSheetsSyncStatus {
+  isConfigured: boolean;
+  hasWebhook: boolean;
+  hasServiceAccount: boolean;
+  spreadsheetId: string;
+  spreadsheetUrl: string;
+  confirmedCount: number;
+}
+
+export interface GoogleSheetsSyncResponse {
+  success: boolean;
+  syncedCount: number;
+  method: "webhook" | "service_account" | "none";
+  error?: string;
+  spreadsheetUrl: string;
+}
+
 export const adminHackathonService = {
   async query(params: QueryParams = {}): Promise<Paginated<AdminApplication>> {
     return adminApplicationService.query({ ...params, type: "hackathon" });
@@ -114,6 +131,12 @@ export const adminHackathonService = {
   },
   async decide(applicationId: string, action: "verify" | "reject", reason?: string): Promise<AdminApplication> {
     return adminApplicationService.decide(applicationId, action, reason);
+  },
+  async getGoogleSheetsStatus(): Promise<GoogleSheetsSyncStatus> {
+    return api.get<GoogleSheetsSyncStatus>("/admin/hackathons/sheets");
+  },
+  async syncGoogleSheets(): Promise<GoogleSheetsSyncResponse> {
+    return api.post<GoogleSheetsSyncResponse>("/admin/hackathons/sheets", {});
   },
 };
 export const mentorService = apiRepository<Mentor>("mentors");
