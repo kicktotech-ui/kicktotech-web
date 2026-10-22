@@ -93,10 +93,25 @@ export const applicationDecisionSchema = z.object({
   reason: z.string().trim().max(240).optional(),
 });
 
+/** Razorpay order creation request. */
+export const razorpayOrderCreateSchema = z.object({
+  applicationId: z.string().trim().min(4).max(64),
+});
+
+/** Razorpay checkout payment verification payload. */
+export const razorpayPaymentVerifySchema = z.object({
+  applicationId: z.string().trim().min(4).max(64),
+  razorpay_order_id: z.string().trim().min(4).max(128),
+  razorpay_payment_id: z.string().trim().min(4).max(128),
+  razorpay_signature: z.string().trim().min(16).max(256),
+});
+
 export type ApplicationInput = z.infer<typeof applicationSchema>;
 export type HackathonApplicationInput = z.infer<typeof hackathonApplicationSchema>;
 export type PaymentProofInput = z.infer<typeof paymentProofSchema>;
 export type ApplicationDecisionInput = z.infer<typeof applicationDecisionSchema>;
+export type RazorpayOrderCreateInput = z.infer<typeof razorpayOrderCreateSchema>;
+export type RazorpayPaymentVerifyInput = z.infer<typeof razorpayPaymentVerifySchema>;
 
 export type StudentRegisterInput = z.infer<typeof studentRegisterSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

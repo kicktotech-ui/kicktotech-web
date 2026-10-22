@@ -232,6 +232,11 @@ export function createFirebaseStore(): DataStore {
       const snap = await db.collection(WRITE.applications).where("dedupeKey", "==", dedupeKey).limit(1).get();
       return snap.empty ? null : (snap.docs[0].data() as ApplicationRecord);
     },
+    async getApplicationByRazorpayOrderId(orderId: string) {
+      const db = await getAdminDb();
+      const snap = await db.collection(WRITE.applications).where("razorpayOrderId", "==", orderId).limit(1).get();
+      return snap.empty ? null : (snap.docs[0].data() as ApplicationRecord);
+    },
     async listApplications() {
       const db = await getAdminDb();
       const snap = await db.collection(WRITE.applications).orderBy("createdAt", "desc").limit(500).get();

@@ -130,6 +130,11 @@ export interface ApplicationRecord {
   certificateId?: string;
   /** ISO timestamp set when the confirmation email was successfully sent (duplicate-send guard). */
   confirmationEmailSentAt?: string;
+  /** Razorpay payment integration fields */
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  razorpaySignature?: string;
+  paymentMethod?: string;
 }
 
 export interface AuditRecord {
@@ -172,6 +177,7 @@ export interface DataStore {
   getApplicationById(id: string): Promise<ApplicationRecord | null>;
   getApplicationByAppId(applicationId: string): Promise<ApplicationRecord | null>;
   getApplicationByDedupeKey(dedupeKey: string): Promise<ApplicationRecord | null>;
+  getApplicationByRazorpayOrderId(orderId: string): Promise<ApplicationRecord | null>;
   listApplications(): Promise<ApplicationRecord[]>;
   updateApplication(id: string, patch: Partial<ApplicationRecord>): Promise<ApplicationRecord | null>;
   // audit
@@ -244,6 +250,9 @@ class MemoryDataStore implements DataStore {
   }
   async getApplicationByDedupeKey(dedupeKey: string) {
     return [...this.applications.values()].find((a) => a.dedupeKey === dedupeKey) ?? null;
+  }
+  async getApplicationByRazorpayOrderId(orderId: string) {
+    return [...this.applications.values()].find((a) => a.razorpayOrderId === orderId) ?? null;
   }
   async listApplications() { return [...this.applications.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)); }
   async updateApplication(id: string, patch: Partial<ApplicationRecord>) {

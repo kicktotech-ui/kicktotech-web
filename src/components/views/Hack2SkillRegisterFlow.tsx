@@ -3,8 +3,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
-  Check, Loader2, ArrowRight, ArrowLeft, ShieldCheck, Copy,
-  MessageCircle, Clock, BadgeCheck, ExternalLink, CheckCircle2,
+  Check, Loader2, ArrowRight, ArrowLeft, ShieldCheck,
+  CreditCard, AlertCircle, ExternalLink, CheckCircle2, RefreshCw,
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/components/providers";
@@ -15,21 +15,49 @@ import { cn, formatINR } from "@/lib/utils";
 
 const HACKATHON_FEE = 99;
 
-const formSteps = ["Personal", "Academic", "Review"] as const;
-const phases = ["Information", "Payment", "Verification"] as const;
+const phases = ["Information", "Payment", "Confirmation"] as const;
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-interface PaymentInfo {
-  upiId: string; payeeName: string; amount: number; currency: string; upiUri: string;
-  whatsappNumber: string; whatsappConfigured: boolean;
-}
 interface ApplyResponse {
-  applicationId: string; status: string; duplicate: boolean;
-  payment: PaymentInfo; whatsappUrl: string | null;
+  applicationId: string;
+  status: string;
+  duplicate: boolean;
 }
 
-type Phase = "form" | "pay" | "proof" | "submitted";
+type Phase = "form" | "checkout" | "cancelled" | "failed" | "verifying" | "confirmed";
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => {
+      open: () => void;
+      on: (event: string, handler: (res: any) => void) => void;
+    };
+  }
+}
+
+/** Dynamically load the official Razorpay Checkout script once. */
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined") return resolve(false);
+    if (window.Razorpay) return resolve(true);
+
+    const existing = document.getElementById("razorpay-checkout-script");
+    if (existing) {
+      existing.addEventListener("load", () => resolve(true));
+      existing.addEventListener("error", () => resolve(false));
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = "razorpay-checkout-script";
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
 
 export function Hack2SkillRegisterFlow() {
   const { user, firebaseUser } = useAuth();
@@ -39,10 +67,14 @@ export function Hack2SkillRegisterFlow() {
   const [academic, setAcademic] = useState({ college: "", course: "", year: "", teamName: "" });
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitting, setSubmitting] = useState(false);
-  const [sendingProof, setSendingProof] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [applied, setApplied] = useState<ApplyResponse | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [paymentResult, setPaymentResult] = useState<{ paymentId?: string; orderId?: string } | null>(null);
+
+  // Pre-load the official Razorpay checkout script on mount
+  useEffect(() => {
+    loadRazorpayScript();
+  }, []);
 
   // Pre-fill fields from authenticated profile
   useEffect(() => {
@@ -63,7 +95,8 @@ export function Hack2SkillRegisterFlow() {
 
   const markTouched = (key: string) => setTouched((t) => ({ ...t, [key]: true }));
 
-  const activePhase = phase === "form" ? 0 : phase === "pay" || phase === "proof" ? 1 : 2;
+  const activePhase =
+    phase === "form" ? 0 : phase === "confirmed" ? 2 : 1;
 
   // Per-field validation (authoritative check still runs server-side).
   const fieldError: Record<string, string | undefined> = {
@@ -88,6 +121,169 @@ export function Hack2SkillRegisterFlow() {
     setStep((s) => s + 1);
   }
 
+  /** Poll the server for authoritative payment confirmation in case of network interruption */
+  const pollPaymentStatus = useCallback(
+    async (appId: string, headers: Record<string, string>, fallbackPaymentId?: string) => {
+      let attempts = 0;
+      const interval = setInterval(async () => {
+        attempts++;
+        try {
+          const res = await api.get<{
+            isPaid: boolean;
+            status: string;
+            razorpayPaymentId?: string;
+          }>(`/hackathon/payment/status?applicationId=${encodeURIComponent(appId)}`, { headers });
+
+          if (res.isPaid) {
+            clearInterval(interval);
+            setPaymentResult({
+              paymentId: res.razorpayPaymentId || fallbackPaymentId,
+            });
+            setPhase("confirmed");
+            return;
+          }
+        } catch {
+          // Keep polling until limit
+        }
+
+        if (attempts >= 8) {
+          clearInterval(interval);
+          setError(
+            "Payment verification timed out. If your account was debited, your registration will be updated shortly via webhook. Please refresh or contact support.",
+          );
+          setPhase("failed");
+        }
+      }, 2500);
+    },
+    [],
+  );
+
+  /** Launch Razorpay Standard Checkout */
+  const launchRazorpay = useCallback(
+    async (appId: string) => {
+      setSubmitting(true);
+      setError(null);
+      setPhase("checkout");
+
+      try {
+        const loaded = await loadRazorpayScript();
+        if (!loaded || !window.Razorpay) {
+          setError("Could not load Razorpay Checkout. Please check your internet connection and try again.");
+          setPhase("failed");
+          setSubmitting(false);
+          return;
+        }
+
+        const token = firebaseUser ? await firebaseUser.getIdToken() : undefined;
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+
+        // 1. Create or retrieve server-authorized Razorpay Order
+        const order = await api.post<{
+          orderId: string;
+          amount: number;
+          currency: string;
+          keyId: string;
+          applicationId: string;
+          alreadyPaid?: boolean;
+        }>("/hackathon/payment/order", { applicationId: appId }, { headers });
+
+        if (order.alreadyPaid) {
+          setPhase("confirmed");
+          setSubmitting(false);
+          return;
+        }
+
+        // 2. Open Razorpay Standard Checkout
+        const rzp = new window.Razorpay({
+          key: order.keyId,
+          amount: order.amount,
+          currency: order.currency,
+          name: "KICK To TECH",
+          description: "PromptWars × KICK To TECH Registration Fee",
+          order_id: order.orderId,
+          prefill: {
+            name: personal.name,
+            email: user?.email || personal.email,
+            contact: personal.phone,
+          },
+          notes: {
+            applicationId: appId,
+          },
+          theme: {
+            color: "#0057ff",
+          },
+          modal: {
+            ondismiss: () => {
+              // User dismissed or closed Checkout
+              setPhase("cancelled");
+              setSubmitting(false);
+            },
+          },
+          handler: async (response: {
+            razorpay_payment_id: string;
+            razorpay_order_id: string;
+            razorpay_signature: string;
+          }) => {
+            setPhase("verifying");
+            setSubmitting(true);
+            try {
+              const verifyRes = await api.post<{
+                applicationId: string;
+                status: string;
+                verified: boolean;
+              }>(
+                "/hackathon/payment/verify",
+                {
+                  applicationId: appId,
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                },
+                { headers },
+              );
+
+              if (verifyRes.verified) {
+                setPaymentResult({
+                  paymentId: response.razorpay_payment_id,
+                  orderId: response.razorpay_order_id,
+                });
+                setPhase("confirmed");
+              } else {
+                pollPaymentStatus(appId, headers, response.razorpay_payment_id);
+              }
+            } catch (err) {
+              console.error("[checkout] Verification error, starting fallback check:", err);
+              pollPaymentStatus(appId, headers, response.razorpay_payment_id);
+            } finally {
+              setSubmitting(false);
+            }
+          },
+        });
+
+        rzp.on("payment.failed", (res: any) => {
+          console.warn("[checkout] Payment failed:", res.error);
+          setError(
+            res.error?.description ||
+              "Your payment could not be processed. Please try another payment method.",
+          );
+          setPhase("failed");
+          setSubmitting(false);
+        });
+
+        rzp.open();
+      } catch (e) {
+        setError(e instanceof ApiError ? e.message : "Could not open checkout. Please try again.");
+        setPhase("failed");
+        setSubmitting(false);
+      }
+    },
+    [firebaseUser, personal, user, pollPaymentStatus],
+  );
+
+  /** Initial registration submission -> directly initiates Razorpay Checkout */
   const continueToPayment = useCallback(async () => {
     setSubmitting(true);
     setError(null);
@@ -111,46 +307,18 @@ export function Hack2SkillRegisterFlow() {
         { headers },
       );
       setApplied(res);
-      setPhase("pay");
+
+      if (res.status === "PAYMENT_VERIFIED" || res.status === "CERTIFICATE_ISSUED") {
+        setPhase("confirmed");
+        return;
+      }
+
+      await launchRazorpay(res.applicationId);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Could not start your registration. Please try again.");
-    } finally {
       setSubmitting(false);
     }
-  }, [personal, academic, user, firebaseUser]);
-
-  const copyUpi = useCallback(async () => {
-    if (!applied) return;
-    try {
-      await navigator.clipboard.writeText(applied.payment.upiId);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    } catch { /* clipboard unavailable */ }
-  }, [applied]);
-
-  const sendProof = useCallback(async () => {
-    if (!applied || sendingProof) return; // prevent duplicate clicks
-    setSendingProof(true);
-    setError(null);
-    // Record proof-submitted server-side (no email is triggered here).
-    try {
-      const token = firebaseUser ? await firebaseUser.getIdToken() : undefined;
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-      await api.post<{ status: string }>(
-        "/hackathon/apply/proof",
-        { applicationId: applied.applicationId },
-        { headers },
-      );
-    } catch (e) {
-      console.warn("[hack2skill] proof submission failed:", e);
-    }
-    if (applied.whatsappUrl) window.open(applied.whatsappUrl, "_blank");
-    setPhase("submitted");
-    setSendingProof(false);
-  }, [applied, sendingProof, firebaseUser]);
+  }, [personal, academic, user, firebaseUser, launchRazorpay]);
 
   return (
     <Section className="pt-8">
@@ -160,20 +328,35 @@ export function Hack2SkillRegisterFlow() {
           {phases.map((label, i) => (
             <li key={label} className="flex flex-1 items-center">
               <div className="flex flex-col items-center">
-                <span className={cn(
-                  "flex h-9 w-9 items-center justify-center rounded-full border text-sm font-semibold transition-colors",
-                  i < activePhase ? "border-accent bg-accent text-accent-foreground" : i === activePhase ? "border-accent text-accent" : "border-line text-muted",
-                )}>
+                <span
+                  className={cn(
+                    "flex h-9 w-9 items-center justify-center rounded-full border text-sm font-semibold transition-colors",
+                    i < activePhase
+                      ? "border-accent bg-accent text-accent-foreground"
+                      : i === activePhase
+                      ? "border-accent text-accent"
+                      : "border-line text-muted",
+                  )}
+                >
                   {i < activePhase ? <Check className="h-4 w-4" /> : i + 1}
                 </span>
                 <span className="mt-2 hidden text-xs text-muted sm:block">{label}</span>
               </div>
-              {i < phases.length - 1 && <span className={cn("mx-2 h-0.5 flex-1 rounded", i < activePhase ? "bg-accent" : "bg-line")} />}
+              {i < phases.length - 1 && (
+                <span
+                  className={cn("mx-2 h-0.5 flex-1 rounded", i < activePhase ? "bg-accent" : "bg-line")}
+                />
+              )}
             </li>
           ))}
         </ol>
 
-        <motion.div key={phase + step} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} className="glass rounded-3xl p-6 sm:p-8">
+        <motion.div
+          key={phase + step}
+          initial={{ opacity: 0, x: 16 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="glass rounded-3xl p-6 sm:p-8"
+        >
           {/* ---- INFORMATION (multi-step form) ---- */}
           {phase === "form" && (
             <>
@@ -181,7 +364,14 @@ export function Hack2SkillRegisterFlow() {
                 <div className="space-y-5">
                   <h2 className="text-xl font-bold">Personal information</h2>
                   <FormField label="Full name" htmlFor="h-name" error={errOf("name")}>
-                    <Input id="h-name" value={personal.name} invalid={Boolean(errOf("name"))} onBlur={() => markTouched("name")} onChange={(e) => setPersonal({ ...personal, name: e.target.value })} placeholder="Your full name" />
+                    <Input
+                      id="h-name"
+                      value={personal.name}
+                      invalid={Boolean(errOf("name"))}
+                      onBlur={() => markTouched("name")}
+                      onChange={(e) => setPersonal({ ...personal, name: e.target.value })}
+                      placeholder="Your full name"
+                    />
                   </FormField>
                   <FormField
                     label="Email ID"
@@ -202,35 +392,69 @@ export function Hack2SkillRegisterFlow() {
                     />
                   </FormField>
                   <FormField label="Phone number" htmlFor="h-phone" error={errOf("phone")}>
-                    <Input id="h-phone" type="tel" value={personal.phone} invalid={Boolean(errOf("phone"))} onBlur={() => markTouched("phone")} onChange={(e) => setPersonal({ ...personal, phone: e.target.value })} placeholder="+91 98765 43210" />
+                    <Input
+                      id="h-phone"
+                      type="tel"
+                      value={personal.phone}
+                      invalid={Boolean(errOf("phone"))}
+                      onBlur={() => markTouched("phone")}
+                      onChange={(e) => setPersonal({ ...personal, phone: e.target.value })}
+                      placeholder="+91 98765 43210"
+                    />
                   </FormField>
                 </div>
               )}
+
               {step === 1 && (
                 <div className="space-y-5">
                   <h2 className="text-xl font-bold">Academic details</h2>
                   <FormField label="College / Institution name" htmlFor="h-college" error={errOf("college")}>
-                    <Input id="h-college" value={academic.college} invalid={Boolean(errOf("college"))} onBlur={() => markTouched("college")} onChange={(e) => setAcademic({ ...academic, college: e.target.value })} placeholder="Your college / institution" />
+                    <Input
+                      id="h-college"
+                      value={academic.college}
+                      invalid={Boolean(errOf("college"))}
+                      onBlur={() => markTouched("college")}
+                      onChange={(e) => setAcademic({ ...academic, college: e.target.value })}
+                      placeholder="Your college / institution"
+                    />
                   </FormField>
                   <div className="grid gap-5 sm:grid-cols-2">
                     <FormField label="Course (optional)" htmlFor="h-course">
-                      <Input id="h-course" value={academic.course} onChange={(e) => setAcademic({ ...academic, course: e.target.value })} placeholder="e.g. B.Tech CSE" />
+                      <Input
+                        id="h-course"
+                        value={academic.course}
+                        onChange={(e) => setAcademic({ ...academic, course: e.target.value })}
+                        placeholder="e.g. B.Tech CSE"
+                      />
                     </FormField>
                     <FormField label="Year of study (optional)" htmlFor="h-year">
-                      <Input id="h-year" value={academic.year} onChange={(e) => setAcademic({ ...academic, year: e.target.value })} placeholder="e.g. 2nd year" />
+                      <Input
+                        id="h-year"
+                        value={academic.year}
+                        onChange={(e) => setAcademic({ ...academic, year: e.target.value })}
+                        placeholder="e.g. 2nd year"
+                      />
                     </FormField>
                   </div>
                   <FormField label="Team name (optional)" htmlFor="h-team" hint="If you already have a team, enter the name here.">
-                    <Input id="h-team" value={academic.teamName} onChange={(e) => setAcademic({ ...academic, teamName: e.target.value })} placeholder="e.g. CodeCrafters" />
+                    <Input
+                      id="h-team"
+                      value={academic.teamName}
+                      onChange={(e) => setAcademic({ ...academic, teamName: e.target.value })}
+                      placeholder="e.g. CodeCrafters"
+                    />
                   </FormField>
                 </div>
               )}
+
               {step === 2 && (
                 <div className="space-y-4">
                   <h2 className="text-xl font-bold">Review your registration</h2>
                   <dl className="divide-y divide-line rounded-2xl border border-line">
                     {[
-                      ["Name", personal.name], ["Email", personal.email], ["Phone", personal.phone],
+                      ["Name", personal.name],
+                      ["Email", personal.email],
+                      ["Phone", personal.phone],
                       ["College", academic.college],
                       ...(academic.course ? [["Course", academic.course]] : []),
                       ...(academic.year ? [["Year", academic.year]] : []),
@@ -238,143 +462,205 @@ export function Hack2SkillRegisterFlow() {
                       ["Event", "PromptWars × KICK To TECH"],
                       ["Registration fee", formatINR(HACKATHON_FEE)],
                     ].map(([k, v]) => (
-                      <div key={k} className="flex justify-between gap-4 p-4 text-sm"><dt className="text-muted">{k}</dt><dd className="font-medium">{v}</dd></div>
+                      <div key={k} className="flex justify-between gap-4 p-4 text-sm">
+                        <dt className="text-muted">{k}</dt>
+                        <dd className="font-medium">{v}</dd>
+                      </div>
                     ))}
                   </dl>
                   {error && <p className="text-sm text-red-400">{error}</p>}
-                  <p className="flex items-center gap-2 text-xs text-muted"><ShieldCheck className="h-4 w-4 text-accent" /> Payment is verified manually by our team. Your registration is confirmed only after payment verification.</p>
+                  <p className="flex items-center gap-2 text-xs text-muted">
+                    <ShieldCheck className="h-4 w-4 text-accent" />
+                    Instant automated payment verification via Razorpay. Your confirmation email will be delivered automatically.
+                  </p>
                 </div>
               )}
 
               <div className="mt-8 flex items-center justify-between">
-                <Button variant="ghost" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0}><ArrowLeft className="h-4 w-4" /> Back</Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => setStep((s) => Math.max(0, s - 1))}
+                  disabled={step === 0 || submitting}
+                >
+                  <ArrowLeft className="h-4 w-4" /> Back
+                </Button>
                 {step < 2 ? (
-                  <Button onClick={goNext} disabled={!canNext}>Continue <ArrowRight className="h-4 w-4" /></Button>
+                  <Button onClick={goNext} disabled={!canNext}>
+                    Continue <ArrowRight className="h-4 w-4" />
+                  </Button>
                 ) : (
-                  <Button onClick={continueToPayment} disabled={submitting}>{submitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Please wait…</> : <>Continue to payment <ArrowRight className="h-4 w-4" /></>}</Button>
+                  <Button onClick={continueToPayment} disabled={submitting}>
+                    {submitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" /> Preparing checkout…
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="h-4 w-4" /> Pay {formatINR(HACKATHON_FEE)} with Razorpay
+                      </>
+                    )}
+                  </Button>
                 )}
               </div>
             </>
           )}
 
-          {/* ---- PAYMENT (static QR image for ₹99) ---- */}
-          {phase === "pay" && applied && (
-            <div className="text-center">
-              <h2 className="text-xl font-bold">Complete your payment</h2>
-              <p className="mt-1 text-sm text-muted">PromptWars × KICK To TECH registration fee</p>
-              <p className="mt-2 text-4xl font-extrabold text-accent">{formatINR(applied.payment.amount)}</p>
-              <p className="mt-4 text-sm text-muted">Scan the QR with any UPI app</p>
-              {/* Display the supplied ₹99 QR image exactly as-is */}
-              <div className="mx-auto mt-4 w-fit rounded-2xl bg-white p-3 shadow-sm">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/images/QR 99 HACKTHOAN.png"
-                  alt="UPI payment QR code for the ₹99 Hack2Skill registration fee — scan and pay with any UPI app"
-                  style={{ width: 280, height: "auto", display: "block" }}
-                />
-              </div>
-
-              <div className="mx-auto mt-5 max-w-sm rounded-2xl border border-line p-4">
-                <p className="text-xs text-muted">UPI ID</p>
-                <div className="mt-1 flex items-center justify-center gap-2">
-                  <span className="font-mono text-sm font-semibold">{applied.payment.upiId}</span>
-                  <button onClick={copyUpi} className="inline-flex items-center gap-1 rounded-lg border border-line px-2 py-1 text-xs hover:bg-white/5">
-                    <Copy className="h-3.5 w-3.5" /> {copied ? "Copied ✓" : "Copy"}
-                  </button>
-                </div>
-                <p className="mt-1 text-[11px] text-muted">Paying {applied.payment.payeeName}</p>
-              </div>
-
-              <Button size="lg" className="mt-6" onClick={() => setPhase("proof")}>I&apos;ve completed payment</Button>
-              <p className="mx-auto mt-4 max-w-sm text-xs text-muted">
-                After paying, tap the button above and send your payment proof on WhatsApp. Your payment is manually verified by our team.
+          {/* ---- CHECKOUT / VERIFYING STATE ---- */}
+          {(phase === "checkout" || phase === "verifying") && (
+            <div className="flex flex-col items-center py-12 text-center">
+              <Loader2 className="h-12 w-12 animate-spin text-accent" />
+              <h2 className="mt-6 text-xl font-bold">
+                {phase === "verifying" ? "Verifying your payment…" : "Connecting to Razorpay Checkout…"}
+              </h2>
+              <p className="mt-2 max-w-sm text-sm text-muted">
+                {phase === "verifying"
+                  ? "We are verifying your transaction with Razorpay. Please do not close or refresh this window."
+                  : "Complete your payment in the Razorpay popup. UPI, Cards, NetBanking, and Wallets supported."}
               </p>
-              <p className="mt-3 font-mono text-[11px] text-muted">Application ID: {applied.applicationId}</p>
+              {applied && (
+                <p className="mt-4 font-mono text-xs text-muted">
+                  Application ID: {applied.applicationId}
+                </p>
+              )}
             </div>
           )}
 
-          {/* ---- VERIFICATION (proof) ---- */}
-          {phase === "proof" && applied && (
-            <div className="text-center">
-              <h2 className="text-xl font-bold">Send your payment proof</h2>
-              <p className="mx-auto mt-3 max-w-md text-sm text-muted">
-                Send your <span className="font-medium text-primary-foreground/90">₹{applied.payment.amount} payment screenshot</span> to our team on WhatsApp.
-                Your payment will be <span className="font-medium text-primary-foreground/90">manually verified</span> before your confirmation email is sent.
-              </p>
-              <div className="mx-auto mt-5 max-w-sm rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
-                <p className="text-xs text-amber-300">⚠️ Clicking this button does not confirm your payment. You must attach and send your payment screenshot in WhatsApp.</p>
+          {/* ---- CANCELLED / DISMISSED STATE ---- */}
+          {phase === "cancelled" && applied && (
+            <div className="flex flex-col items-center py-6 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 ring-1 ring-amber-500/30">
+                <AlertCircle className="h-7 w-7 text-amber-400" />
               </div>
-              <div className="mt-6 flex flex-col items-center gap-3">
-                <Button size="lg" onClick={sendProof} disabled={!applied.whatsappUrl || sendingProof}>
-                  {sendingProof ? <><Loader2 className="h-4 w-4 animate-spin" /> Opening WhatsApp…</> : <><MessageCircle className="h-4 w-4" /> Send payment proof on WhatsApp</>}
+              <h2 className="mt-4 text-xl font-bold">Payment was not completed</h2>
+              <p className="mt-2 max-w-md text-sm text-muted">
+                You closed the payment window before completing the transaction. Your registration is saved as pending.
+                You can retry whenever you are ready.
+              </p>
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                <Button
+                  size="lg"
+                  onClick={() => launchRazorpay(applied.applicationId)}
+                  disabled={submitting}
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Opening Razorpay…
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="h-4 w-4" /> Pay {formatINR(HACKATHON_FEE)} now
+                    </>
+                  )}
                 </Button>
-                {!applied.whatsappUrl && <p className="text-xs text-amber-400">WhatsApp number not configured yet — please contact the team.</p>}
-                <Button variant="ghost" onClick={() => setPhase("pay")}><ArrowLeft className="h-4 w-4" /> Back to payment</Button>
+                <Button variant="ghost" onClick={() => setPhase("form")}>
+                  Review registration details
+                </Button>
               </div>
-              <p className="mt-4 font-mono text-[11px] text-muted">Application ID: {applied.applicationId}</p>
+              <p className="mt-6 font-mono text-xs text-muted">
+                Application ID: {applied.applicationId}
+              </p>
             </div>
           )}
 
-          {/* ---- SUBMITTED (awaiting admin verification) ---- */}
-          {phase === "submitted" && applied && (
+          {/* ---- FAILED STATE ---- */}
+          {phase === "failed" && (
+            <div className="flex flex-col items-center py-6 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-500/10 ring-1 ring-red-500/30">
+                <AlertCircle className="h-7 w-7 text-red-400" />
+              </div>
+              <h2 className="mt-4 text-xl font-bold">Payment could not be completed</h2>
+              <p className="mt-2 max-w-md text-sm text-muted">
+                {error || "An error occurred during payment processing. No funds were captured or your bank may decline the attempt."}
+              </p>
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                {applied && (
+                  <Button
+                    size="lg"
+                    onClick={() => launchRazorpay(applied.applicationId)}
+                    disabled={submitting}
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" /> Retrying…
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4" /> Try again
+                      </>
+                    )}
+                  </Button>
+                )}
+                <Button variant="ghost" onClick={() => setPhase("form")}>
+                  Edit details
+                </Button>
+              </div>
+              {applied && (
+                <p className="mt-6 font-mono text-xs text-muted">
+                  Application ID: {applied.applicationId}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* ---- CONFIRMED STATE (Payment Verified & Brevo Template 5 sent) ---- */}
+          {phase === "confirmed" && (
             <div className="flex flex-col items-center text-center">
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: "spring", stiffness: 200, damping: 14, delay: 0.1 }}
-                className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/15 ring-1 ring-accent/30"
+                className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/15 ring-1 ring-emerald-500/30"
               >
-                <CheckCircle2 className="h-8 w-8 text-accent" />
+                <CheckCircle2 className="h-8 w-8 text-emerald-400" />
               </motion.div>
-              <h2 className="mt-4 text-xl font-bold">Payment proof submitted!</h2>
+              <h2 className="mt-4 text-2xl font-bold">Payment Verified &amp; Registration Confirmed!</h2>
               <p className="mx-auto mt-2 max-w-md text-sm text-muted">
-                Your payment declaration has been recorded. Please ensure you have sent your{" "}
-                <span className="font-medium text-primary-foreground/90">₹{applied.payment.amount} payment screenshot</span>{" "}
-                on WhatsApp for verification.
+                Your payment of <span className="font-semibold text-primary-foreground">{formatINR(HACKATHON_FEE)}</span> has been authoritatively verified.
+                Your official confirmation email (with event schedules and instructions) has been sent to{" "}
+                <span className="font-semibold text-primary-foreground">{user?.email || personal.email}</span>.
               </p>
 
-              {/* Status lifecycle */}
-              <div className="mx-auto mt-6 max-w-sm space-y-2 text-left text-xs">
-                <div className="flex items-center gap-2 rounded-lg border border-accent/20 bg-accent/5 px-3 py-2">
-                  <Check className="h-3.5 w-3.5 text-accent" /> <span>Registration submitted</span>
-                </div>
-                <div className="flex items-center gap-2 rounded-lg border border-accent/20 bg-accent/5 px-3 py-2">
-                  <Check className="h-3.5 w-3.5 text-accent" /> <span>Payment proof declared</span>
-                </div>
-                <div className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 font-medium text-amber-300">
-                  <Clock className="h-3.5 w-3.5" /> <span>Awaiting admin payment verification</span>
-                </div>
-                <div className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-muted">
-                  <BadgeCheck className="h-3.5 w-3.5" /> <span>Confirmation email will be sent after verification</span>
-                </div>
+              {/* Verified metadata */}
+              <div className="mx-auto mt-6 flex flex-wrap items-center justify-center gap-3">
+                {applied && (
+                  <div className="rounded-xl border border-line bg-surface/50 px-4 py-2 font-mono text-xs">
+                    <span className="text-muted">Application ID:</span>{" "}
+                    <span className="font-semibold text-accent">{applied.applicationId}</span>
+                  </div>
+                )}
+                {paymentResult?.paymentId && (
+                  <div className="rounded-xl border border-line bg-surface/50 px-4 py-2 font-mono text-xs">
+                    <span className="text-muted">Payment ID:</span>{" "}
+                    <span className="font-semibold text-emerald-400">{paymentResult.paymentId}</span>
+                  </div>
+                )}
               </div>
 
-              {/* Payment verification notice */}
-              <div className="mx-auto mt-6 max-w-md rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 text-left">
-                <p className="text-xs text-amber-300">
-                  <span className="font-medium text-amber-200">⚠️ Important:</span>{" "}
-                  Your payment will be manually verified by our team against the actual receiving account.
-                  Your confirmation email (with hackathon details and next steps) will be sent only after
-                  your payment has been verified by an admin.
-                </p>
-              </div>
-
-              {/* PromptWars external registration notice — always shown */}
-              <div className="mx-auto mt-4 max-w-md rounded-2xl border border-accent/30 bg-accent/5 p-5 text-left">
+              {/* PromptWars external registration notice — next step */}
+              <div className="mx-auto mt-6 max-w-md rounded-2xl border border-accent/30 bg-accent/5 p-5 text-left">
                 <h3 className="flex items-center gap-2 text-sm font-semibold text-accent">
-                  <ExternalLink className="h-4 w-4" /> Next Step: Complete Hack2Skill Registration
+                  <ExternalLink className="h-4 w-4" /> Next Step: Complete Hack2Skill Platform Registration
                 </h3>
                 <p className="mt-2 text-xs text-muted">
-                  To complete your hackathon participation, you must also register on the official PromptWars platform.
-                  Visit the{" "}
-                  <a href="https://hack2skill.com/event/promptwars-x-kicktotech-promptwars-2026?utm_source=hack2skill&utm_medium=homepage" target="_blank" rel="noopener noreferrer" className="font-medium text-accent underline">PromptWars registration page</a> to register.
+                  To complete your official hackathon participation, register on the Hack2Skill PromptWars platform:
                 </p>
+                <div className="mt-3">
+                  <a
+                    href="https://hack2skill.com/event/promptwars-x-kicktotech-promptwars-2026?utm_source=hack2skill&utm_medium=homepage"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent underline hover:text-accent/80"
+                  >
+                    Open PromptWars Registration Page <ArrowRight className="h-3 w-3" />
+                  </a>
+                </div>
               </div>
 
-              <div className="mt-5 flex items-center gap-2 rounded-xl border border-line px-4 py-2 text-sm">
-                <BadgeCheck className="h-4 w-4 text-accent" /> Application ID: <span className="font-mono font-semibold">{applied.applicationId}</span>
+              <div className="mt-8">
+                <Button variant="ghost" onClick={() => (window.location.href = "/hackathon")}>
+                  Return to Hackathons
+                </Button>
               </div>
-              <p className="mt-3 text-xs text-muted">Did not open WhatsApp? <button onClick={sendProof} disabled={sendingProof} className="font-medium text-accent underline disabled:opacity-50">Try again</button></p>
             </div>
           )}
         </motion.div>
