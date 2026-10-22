@@ -139,6 +139,103 @@ export interface ApplicationRecord {
   paymentMethod?: string;
 }
 
+/**
+ * Normalizes an amount from any representation:
+ * - numbers: 99, 449, 222, or paise (9900, 44900)
+ * - strings: "99", "₹99", "99.00", "449", "₹449", "9900"
+ */
+export function parseRecordAmount(d: Record<string, unknown> | null | undefined, fallback: number): number {
+  if (!d) return fallback;
+  const raw =
+    d.amount ??
+    d.paymentAmount ??
+    d.paidAmount ??
+    d.amountPaid ??
+    d.fee ??
+    d.price ??
+    d.totalAmount;
+
+  if (typeof raw === "number") {
+    if (raw === 9900) return 99;
+    if (raw === 44900) return 449;
+    if (raw === 22200) return 222;
+    if (raw > 0) return raw;
+  } else if (typeof raw === "string") {
+    const cleaned = raw.replace(/[₹,\s]/g, "");
+    const val = parseFloat(cleaned);
+    if (!isNaN(val)) {
+      if (val === 9900) return 99;
+      if (val === 44900) return 449;
+      if (val === 22200) return 222;
+      if (val > 0) return val;
+    }
+  }
+  return fallback;
+}
+
+/**
+ * Universal predicate to classify whether a record is a Hackathon / ₹99 payment
+ * vs an Internship / ₹449 application.
+ */
+export function isHackathonRecord(d: Record<string, unknown> | null | undefined): boolean {
+  if (!d) return false;
+
+  // 1. Amount match (99 or 9900 paise)
+  const amount = parseRecordAmount(d, 0);
+  if (amount === 99) return true;
+
+  // 2. Explicit domain check
+  const domain = String(d.domain || d.domainId || "").toLowerCase();
+  if (
+    domain === "hack2skill" ||
+    domain.includes("hack") ||
+    domain.includes("prompt") ||
+    domain.includes("war")
+  ) {
+    return true;
+  }
+
+  // 3. String content checks across candidate fields
+  const candidateFields = [
+    d.event,
+    d.eventName,
+    d.program,
+    d.courseTitle,
+    d.title,
+    d.type,
+    d.track,
+    d.hackathon,
+    d.eventTitle,
+    d.category,
+    d.notes,
+    d.description,
+    d.course,
+  ];
+
+  for (const f of candidateFields) {
+    if (typeof f === "string") {
+      const lower = f.toLowerCase();
+      if (
+        lower.includes("hack") ||
+        lower.includes("prompt") ||
+        lower.includes("war") ||
+        lower.includes("hack2skill")
+      ) {
+        return true;
+      }
+    }
+  }
+
+  // 4. Team registration match (hackathons have teamName without internship mentor)
+  if (Boolean(d.teamName) && !d.mentorId && !d.mentorName) {
+    if (!domain.includes("python") && !domain.includes("java")) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export interface AuditRecord {
   id: string;
   ts: string;

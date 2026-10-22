@@ -2,11 +2,12 @@ import { route, ok, parseJson } from "@/server/http";
 import { requireAdmin } from "@/server/auth/guard";
 import { applicationDecisionSchema } from "@/server/validation";
 import { listApplications, verifyPayment, rejectPayment } from "@/server/applications";
+import { isHackathonRecord } from "@/server/data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** List internship applications (manual-payment gate) with pagination + filter. */
+/** List applications with pagination + filter (type: internship vs hackathon). */
 export const GET = route(async (req, { requestId }) => {
   await requireAdmin("applications.read");
   const url = new URL(req.url);
@@ -18,9 +19,9 @@ export const GET = route(async (req, { requestId }) => {
 
   let rows = await listApplications();
   if (type === "internship") {
-    rows = rows.filter((r) => r.domain !== "hack2skill" && r.amount !== 99);
+    rows = rows.filter((r) => !isHackathonRecord(r as unknown as Record<string, unknown>));
   } else if (type === "hackathon") {
-    rows = rows.filter((r) => r.domain === "hack2skill" || r.amount === 99);
+    rows = rows.filter((r) => isHackathonRecord(r as unknown as Record<string, unknown>));
   }
   if (status) rows = rows.filter((r) => r.status === status);
   if (search) {
@@ -37,6 +38,7 @@ export const GET = route(async (req, { requestId }) => {
         r.year ?? "",
         r.razorpayOrderId ?? "",
         r.razorpayPaymentId ?? "",
+        r.domain ?? "",
       ].some((v) => v.toLowerCase().includes(search)),
     );
   }

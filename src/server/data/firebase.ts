@@ -1,8 +1,9 @@
 import type { Query } from "firebase-admin/firestore";
 import { getAdminDb } from "../firebase/admin";
-import type {
-  DataStore, UserRecord, SessionRecord, CertificateRecord, AuditRecord,
-  CertificateStatus, PageResult, ApplicationRecord,
+import {
+  type DataStore, type UserRecord, type SessionRecord, type CertificateRecord, type AuditRecord,
+  type CertificateStatus, type PageResult, type ApplicationRecord,
+  isHackathonRecord, parseRecordAmount,
 } from "./index";
 import { uuid } from "../crypto";
 
@@ -87,48 +88,122 @@ function mapIntern(id: string, d: Doc): UserRecord {
   };
 }
 
+function mergeApplicationRecords(existing: ApplicationRecord, incoming: ApplicationRecord): ApplicationRecord {
+  // Prefer verified or paid status over pending
+  let status = existing.status;
+  if (incoming.status === "PAYMENT_VERIFIED" || incoming.status === "CERTIFICATE_ISSUED") {
+    status = incoming.status;
+  } else if (existing.status === "PAYMENT_PENDING" && incoming.status !== "PAYMENT_PENDING") {
+    status = incoming.status;
+  }
+
+  // Determine amount: prefer incoming if incoming is non-default or explicit
+  let amount = existing.amount;
+  if (incoming.amount && incoming.amount !== 449) {
+    amount = incoming.amount;
+  } else if (!amount || amount === 0) {
+    amount = incoming.amount || 449;
+  }
+
+  return {
+    ...incoming,
+    ...existing,
+    status,
+    amount,
+    name: existing.name && existing.name !== "Participant" ? existing.name : incoming.name,
+    email: existing.email || incoming.email,
+    phone: existing.phone || incoming.phone,
+    college: existing.college || incoming.college,
+    course: existing.course || incoming.course,
+    year: existing.year || incoming.year,
+    teamName: existing.teamName || incoming.teamName,
+    schoolName: existing.schoolName || incoming.schoolName || existing.teamName || incoming.teamName,
+    domain: existing.domain && existing.domain !== "python" ? existing.domain : incoming.domain,
+    razorpayOrderId: existing.razorpayOrderId || incoming.razorpayOrderId,
+    razorpayPaymentId: existing.razorpayPaymentId || incoming.razorpayPaymentId,
+    razorpaySignature: existing.razorpaySignature || incoming.razorpaySignature,
+    paymentMethod: existing.paymentMethod || incoming.paymentMethod,
+    reviewNote: existing.reviewNote || incoming.reviewNote,
+    certificateId: existing.certificateId || incoming.certificateId,
+    verifiedBy: existing.verifiedBy || incoming.verifiedBy,
+    verifiedAt: existing.verifiedAt || incoming.verifiedAt,
+    createdAt: existing.createdAt || incoming.createdAt,
+    updatedAt: incoming.updatedAt || existing.updatedAt,
+  };
+}
+
 function mapLegacyApplication(id: string, d: Doc): ApplicationRecord {
-  const rawStatus = str(d.status).toUpperCase();
-  const rawPayment = str(d.paymentStatus).toUpperCase();
+  const isHack = isHackathonRecord(d);
+
+  const rawStatus = str(d.status || d.state || "").toUpperCase();
+  const rawPayment = str(d.paymentStatus || d.payment_status || d.orderStatus || "").toUpperCase();
   let status: ApplicationRecord["status"] = "PAYMENT_PENDING";
 
   if (rawStatus === "CERTIFICATE_ISSUED" || d.certificate || d.certificateId) {
     status = "CERTIFICATE_ISSUED";
   } else if (
     rawPayment.includes("PAID") ||
+    rawPayment.includes("CAPTURED") ||
+    rawPayment.includes("SUCCESS") ||
     rawStatus.includes("VERIF") ||
     rawStatus.includes("APPROV") ||
-    rawStatus === "ACTIVE"
+    rawStatus === "ACTIVE" ||
+    rawStatus === "PAID" ||
+    rawStatus === "COMPLETED" ||
+    Boolean(d.razorpayPaymentId || d.razorpay_payment_id || d.paymentId)
   ) {
     status = "PAYMENT_VERIFIED";
-  } else if (rawStatus.includes("REJECT") || rawPayment.includes("FAIL")) {
+  } else if (rawStatus.includes("REJECT") || rawPayment.includes("FAIL") || rawStatus.includes("CANCEL")) {
     status = "PAYMENT_REJECTED";
   } else if (rawStatus.includes("PROOF") || rawStatus.includes("SUBMIT")) {
     status = "PAYMENT_PROOF_SUBMITTED";
   }
 
-  const domain = str(d.domain || d.domainId || "python");
-  const isHackathon = domain === "hack2skill" || str(d.program).toLowerCase().includes("hack") || d.amount === 99;
-  const defaultAmount = isHackathon ? 99 : 449;
-  const amount = typeof d.amount === "number" ? d.amount : defaultAmount;
-  const createdAt = toIso(d.createdAt || d.appliedAt || d.registeredAt || new Date().toISOString());
+  // Domain / Event:
+  let domain = str(d.domain || d.domainId || d.event || d.eventName || d.program || "");
+  if (isHack) {
+    if (!domain || domain === "python" || domain === "java") {
+      domain = "hack2skill";
+    }
+  } else {
+    if (!domain) domain = "python";
+  }
+
+  const defaultAmount = isHack ? 99 : 449;
+  const amount = parseRecordAmount(d, defaultAmount);
+
+  const createdAt = toIso(d.createdAt || d.appliedAt || d.registeredAt || d.date || d.timestamp || d.paidAt || new Date().toISOString());
   const updatedAt = toIso(d.updatedAt || d.createdAt || createdAt);
-  const email = str(d.email);
+
+  const email = str(d.email || d.userEmail || d.studentEmail || "").trim();
+  const name = str(d.name || d.fullName || d.userName || d.participantName || d.studentName || d.applicantName || "Participant");
+  const phone = str(d.phone || d.phoneNumber || d.mobile || d.contact || d.contactNumber || "");
+
+  const college = d.college ? str(d.college) : d.collegeName ? str(d.collegeName) : d.university ? str(d.university) : d.institute ? str(d.institute) : undefined;
+  const course = d.course ? str(d.course) : d.stream ? str(d.stream) : d.branch ? str(d.branch) : d.degree ? str(d.degree) : undefined;
+  const year = d.year ? str(d.year) : d.studyYear ? str(d.studyYear) : d.gradYear ? str(d.gradYear) : undefined;
+  const city = d.city ? str(d.city) : d.location ? str(d.location) : undefined;
+  const teamName = d.teamName ? str(d.teamName) : d.team_name ? str(d.team_name) : d.team ? str(d.team) : d.schoolName ? str(d.schoolName) : undefined;
+
+  const razorpayOrderId = d.razorpayOrderId ? str(d.razorpayOrderId) : d.razorpay_order_id ? str(d.razorpay_order_id) : d.orderId ? str(d.orderId) : d.order_id ? str(d.order_id) : undefined;
+  const razorpayPaymentId = d.razorpayPaymentId ? str(d.razorpayPaymentId) : d.razorpay_payment_id ? str(d.razorpay_payment_id) : d.paymentId ? str(d.paymentId) : d.payment_id ? str(d.payment_id) : undefined;
+  const razorpaySignature = d.razorpaySignature ? str(d.razorpaySignature) : d.razorpay_signature ? str(d.razorpay_signature) : undefined;
+  const paymentMethod = d.paymentMethod ? str(d.paymentMethod) : d.method ? str(d.method) : undefined;
 
   return {
     id,
-    applicationId: str(d.applicationId || d.appId || id),
-    name: str(d.name),
+    applicationId: str(d.applicationId || d.appId || d.orderId || id),
+    name,
     email,
-    phone: str(d.phone),
-    college: d.college ? str(d.college) : undefined,
+    phone,
+    college,
     prn: d.prn ? str(d.prn) : undefined,
-    schoolName: d.schoolName ? str(d.schoolName) : undefined,
+    schoolName: d.schoolName ? str(d.schoolName) : teamName,
     division: d.division ? str(d.division) : undefined,
-    course: d.course ? str(d.course) : undefined,
-    year: d.year ? str(d.year) : undefined,
-    city: d.city ? str(d.city) : undefined,
-    teamName: d.teamName ? str(d.teamName) : d.schoolName ? str(d.schoolName) : undefined,
+    course,
+    year,
+    city,
+    teamName,
     domain,
     mentorId: d.mentorId ? str(d.mentorId) : undefined,
     mentorName: d.mentorName ? str(d.mentorName) : undefined,
@@ -141,10 +216,10 @@ function mapLegacyApplication(id: string, d: Doc): ApplicationRecord {
     verifiedBy: d.verifiedBy ? str(d.verifiedBy) : undefined,
     verifiedAt: d.verifiedAt ? toIso(d.verifiedAt) : undefined,
     certificateId: d.certificateId ? str(d.certificateId) : undefined,
-    razorpayOrderId: d.razorpayOrderId ? str(d.razorpayOrderId) : undefined,
-    razorpayPaymentId: d.razorpayPaymentId ? str(d.razorpayPaymentId) : undefined,
-    razorpaySignature: d.razorpaySignature ? str(d.razorpaySignature) : undefined,
-    paymentMethod: d.paymentMethod ? str(d.paymentMethod) : undefined,
+    razorpayOrderId,
+    razorpayPaymentId,
+    razorpaySignature,
+    paymentMethod,
   };
 }
 
@@ -347,127 +422,187 @@ export function createFirebaseStore(): DataStore {
     },
     async getApplicationById(id: string) {
       const db = await getAdminDb();
-      try {
-        const doc = await db.collection(WRITE.applications).doc(id).get();
-        if (doc.exists) {
-          const d = doc.data() as ApplicationRecord;
-          return { ...d, id: doc.id, teamName: d.teamName || d.schoolName };
-        }
-      } catch (e) {
-        console.warn("[firebaseStore] getApplicationById error in ktt_applications:", e);
-      }
-      try {
-        const legacyDoc = await db.collection(READ.applications).doc(id).get();
-        if (legacyDoc.exists) return mapLegacyApplication(legacyDoc.id, legacyDoc.data() as Doc);
-      } catch (e) {
-        console.warn("[firebaseStore] getApplicationById error in registrations:", e);
+      const candidateCols = [
+        WRITE.applications,
+        READ.applications,
+        "applications",
+        "hackathon_registrations",
+        "hackathons",
+        "hackathon",
+        "hack2skill",
+        "payments",
+        "orders",
+        "event_registrations",
+      ];
+      for (const col of candidateCols) {
+        try {
+          const doc = await db.collection(col).doc(id).get();
+          if (doc.exists) {
+            return mapLegacyApplication(doc.id, doc.data() as Doc);
+          }
+        } catch {}
       }
       return null;
     },
     async getApplicationByAppId(applicationId: string) {
       const db = await getAdminDb();
-      try {
-        const snap = await db.collection(WRITE.applications).where("applicationId", "==", applicationId).limit(1).get();
-        if (!snap.empty) {
-          const doc = snap.docs[0];
-          const d = doc.data() as ApplicationRecord;
-          return { ...d, id: doc.id, teamName: d.teamName || d.schoolName };
-        }
-      } catch (e) {
-        console.warn("[firebaseStore] getApplicationByAppId error in ktt_applications:", e);
-      }
-      try {
-        const legacySnap = await db.collection(READ.applications).where("applicationId", "==", applicationId).limit(1).get();
-        if (!legacySnap.empty) {
-          return mapLegacyApplication(legacySnap.docs[0].id, legacySnap.docs[0].data() as Doc);
-        }
-        const doc = await db.collection(READ.applications).doc(applicationId).get();
-        if (doc.exists) return mapLegacyApplication(doc.id, doc.data() as Doc);
-      } catch (e) {
-        console.warn("[firebaseStore] getApplicationByAppId error in registrations:", e);
+      const candidateCols = [
+        WRITE.applications,
+        READ.applications,
+        "applications",
+        "hackathon_registrations",
+        "hackathons",
+        "hackathon",
+        "hack2skill",
+        "payments",
+        "orders",
+        "event_registrations",
+      ];
+      for (const col of candidateCols) {
+        try {
+          const snap = await db.collection(col).where("applicationId", "==", applicationId).limit(1).get();
+          if (!snap.empty) {
+            return mapLegacyApplication(snap.docs[0].id, snap.docs[0].data() as Doc);
+          }
+          const doc = await db.collection(col).doc(applicationId).get();
+          if (doc.exists) {
+            return mapLegacyApplication(doc.id, doc.data() as Doc);
+          }
+        } catch {}
       }
       return null;
     },
     async getApplicationByDedupeKey(dedupeKey: string) {
       const db = await getAdminDb();
-      try {
-        const snap = await db.collection(WRITE.applications).where("dedupeKey", "==", dedupeKey).limit(1).get();
-        if (!snap.empty) {
-          const doc = snap.docs[0];
-          const d = doc.data() as ApplicationRecord;
-          return { ...d, id: doc.id, teamName: d.teamName || d.schoolName };
-        }
-      } catch (e) {
-        console.warn("[firebaseStore] getApplicationByDedupeKey error in ktt_applications:", e);
-      }
-      try {
-        const legacySnap = await db.collection(READ.applications).where("dedupeKey", "==", dedupeKey).limit(1).get();
-        if (!legacySnap.empty) {
-          return mapLegacyApplication(legacySnap.docs[0].id, legacySnap.docs[0].data() as Doc);
-        }
-      } catch (e) {
-        console.warn("[firebaseStore] getApplicationByDedupeKey error in registrations:", e);
+      const candidateCols = [
+        WRITE.applications,
+        READ.applications,
+        "applications",
+        "hackathon_registrations",
+        "hackathons",
+        "hackathon",
+        "hack2skill",
+        "payments",
+        "orders",
+        "event_registrations",
+      ];
+      for (const col of candidateCols) {
+        try {
+          const snap = await db.collection(col).where("dedupeKey", "==", dedupeKey).limit(1).get();
+          if (!snap.empty) {
+            return mapLegacyApplication(snap.docs[0].id, snap.docs[0].data() as Doc);
+          }
+        } catch {}
       }
       return null;
     },
     async getApplicationByRazorpayOrderId(orderId: string) {
       const db = await getAdminDb();
-      try {
-        const snap = await db.collection(WRITE.applications).where("razorpayOrderId", "==", orderId).limit(1).get();
-        if (!snap.empty) {
-          const doc = snap.docs[0];
-          const d = doc.data() as ApplicationRecord;
-          return { ...d, id: doc.id, teamName: d.teamName || d.schoolName };
-        }
-      } catch (e) {
-        console.warn("[firebaseStore] getApplicationByRazorpayOrderId error in ktt_applications:", e);
-      }
-      try {
-        const legacySnap = await db.collection(READ.applications).where("razorpayOrderId", "==", orderId).limit(1).get();
-        if (!legacySnap.empty) {
-          return mapLegacyApplication(legacySnap.docs[0].id, legacySnap.docs[0].data() as Doc);
-        }
-      } catch (e) {
-        console.warn("[firebaseStore] getApplicationByRazorpayOrderId error in registrations:", e);
+      const candidateCols = [
+        WRITE.applications,
+        READ.applications,
+        "applications",
+        "hackathon_registrations",
+        "hackathons",
+        "hackathon",
+        "hack2skill",
+        "payments",
+        "orders",
+        "event_registrations",
+      ];
+      for (const col of candidateCols) {
+        try {
+          for (const field of ["razorpayOrderId", "razorpay_order_id", "orderId"]) {
+            const snap = await db.collection(col).where(field, "==", orderId).limit(1).get();
+            if (!snap.empty) {
+              return mapLegacyApplication(snap.docs[0].id, snap.docs[0].data() as Doc);
+            }
+          }
+        } catch {}
       }
       return null;
     },
     async listApplications() {
       const db = await getAdminDb();
       const recordsMap = new Map<string, ApplicationRecord>();
+      const orderIdIndex = new Map<string, string>();
+      const dedupeIndex = new Map<string, string>();
 
-      // 1. Fetch from namespaced WRITE.applications (ktt_applications)
-      try {
-        const snap = await db.collection(WRITE.applications).limit(1000).get();
-        for (const doc of snap.docs) {
-          const data = doc.data() as ApplicationRecord;
-          const rec: ApplicationRecord = {
-            ...data,
-            id: doc.id,
-            teamName: data.teamName || data.schoolName,
-          };
-          const key = rec.applicationId || doc.id;
-          recordsMap.set(key, rec);
-        }
-      } catch (err) {
-        console.warn("[firebaseStore] Failed reading ktt_applications:", err);
-      }
+      const candidateCollections = new Set<string>([
+        WRITE.applications,
+        READ.applications,
+        "applications",
+        "hackathon_registrations",
+        "hackathons",
+        "hackathon",
+        "hack2skill",
+        "payments",
+        "payment",
+        "orders",
+        "order",
+        "event_registrations",
+        "events",
+        "ktt_payments",
+        "ktt_registrations",
+      ]);
 
-      // 2. Fallback / Merge from legacy READ.applications (registrations)
+      // Dynamically discover all top-level collections in Firestore
       try {
-        const snapLegacy = await db.collection(READ.applications).limit(1000).get();
-        for (const doc of snapLegacy.docs) {
-          const rec = mapLegacyApplication(doc.id, doc.data() as Doc);
-          const key = rec.applicationId || doc.id;
-          if (!recordsMap.has(key)) {
-            recordsMap.set(key, rec);
+        const topCollections = await db.listCollections();
+        for (const col of topCollections) {
+          const id = col.id;
+          const lower = id.toLowerCase();
+          if (
+            lower.includes("hack") ||
+            lower.includes("regist") ||
+            lower.includes("appl") ||
+            lower.includes("pay") ||
+            lower.includes("order") ||
+            lower.includes("event")
+          ) {
+            candidateCollections.add(id);
           }
         }
       } catch (err) {
-        console.warn("[firebaseStore] Failed reading registrations:", err);
+        console.warn("[firebaseStore] listCollections not accessible or empty, using candidate list:", err);
       }
 
-      // 3. Sort descending in memory (safe against missing timestamps / index errors)
+      for (const colName of candidateCollections) {
+        try {
+          const snap = await db.collection(colName).limit(1000).get();
+          for (const doc of snap.docs) {
+            const raw = doc.data() as Doc;
+            if (!raw || Object.keys(raw).length === 0) continue;
+
+            const rec = mapLegacyApplication(doc.id, raw);
+
+            const primaryKey = rec.applicationId || doc.id;
+
+            // Match existing record by primaryKey, orderId, or dedupeKey
+            let matchedKey = recordsMap.has(primaryKey) ? primaryKey : undefined;
+            if (!matchedKey && rec.razorpayOrderId && orderIdIndex.has(rec.razorpayOrderId)) {
+              matchedKey = orderIdIndex.get(rec.razorpayOrderId);
+            }
+            if (!matchedKey && rec.dedupeKey && dedupeIndex.has(rec.dedupeKey)) {
+              matchedKey = dedupeIndex.get(rec.dedupeKey);
+            }
+
+            if (matchedKey && recordsMap.has(matchedKey)) {
+              const existing = recordsMap.get(matchedKey)!;
+              const merged = mergeApplicationRecords(existing, rec);
+              recordsMap.set(matchedKey, merged);
+            } else {
+              recordsMap.set(primaryKey, rec);
+              if (rec.razorpayOrderId) orderIdIndex.set(rec.razorpayOrderId, primaryKey);
+              if (rec.dedupeKey) dedupeIndex.set(rec.dedupeKey, primaryKey);
+            }
+          }
+        } catch {
+          // Skip missing collections gracefully
+        }
+      }
+
+      // Sort descending in memory (safe against missing timestamps / index errors)
       const list = Array.from(recordsMap.values());
       list.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
       return list;

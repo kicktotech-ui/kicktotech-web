@@ -1,10 +1,39 @@
 import assert from "node:assert";
-import { getStore } from "../src/server/data/index.ts";
+import { getStore, isHackathonRecord, parseRecordAmount } from "../src/server/data/index.ts";
 
 async function runTests() {
   console.log("=================================================");
   console.log("TESTING APPLICATION SEPARATION (INTERNSHIP vs HACKATHON)");
   console.log("=================================================\n");
+
+  // Test 1: isHackathonRecord unit tests
+  console.log("--- Test 1: isHackathonRecord Unit Tests ---");
+  assert.strictEqual(isHackathonRecord({ amount: 99 }), true, "amount: 99 is hackathon");
+  assert.strictEqual(isHackathonRecord({ amount: "99" }), true, "amount: '99' is hackathon");
+  assert.strictEqual(isHackathonRecord({ amount: "₹99" }), true, "amount: '₹99' is hackathon");
+  assert.strictEqual(isHackathonRecord({ amount: 9900 }), true, "amount: 9900 (paise) is hackathon");
+  assert.strictEqual(isHackathonRecord({ paymentAmount: "99" }), true, "paymentAmount: '99' is hackathon");
+  assert.strictEqual(isHackathonRecord({ domain: "hack2skill" }), true, "domain: hack2skill is hackathon");
+  assert.strictEqual(isHackathonRecord({ event: "PromptWars" }), true, "event: PromptWars is hackathon");
+  assert.strictEqual(isHackathonRecord({ program: "PromptWars x KickToTech" }), true, "program: PromptWars is hackathon");
+  assert.strictEqual(isHackathonRecord({ teamName: "Alpha Squad" }), true, "teamName without mentor is hackathon");
+  
+  // Negative tests
+  assert.strictEqual(isHackathonRecord({ domain: "python", amount: 449 }), false, "python 449 is internship");
+  assert.strictEqual(isHackathonRecord({ domain: "java", amount: 449 }), false, "java 449 is internship");
+  assert.strictEqual(isHackathonRecord({ domain: "python", mentorId: "m1", teamName: "intern team" }), false, "python with mentor is internship");
+  console.log("✓ All isHackathonRecord assertions passed!");
+
+  // Test 2: parseRecordAmount unit tests
+  console.log("\n--- Test 2: parseRecordAmount Unit Tests ---");
+  assert.strictEqual(parseRecordAmount({ amount: 99 }, 0), 99);
+  assert.strictEqual(parseRecordAmount({ amount: "99" }, 0), 99);
+  assert.strictEqual(parseRecordAmount({ amount: "₹99" }, 0), 99);
+  assert.strictEqual(parseRecordAmount({ amount: 9900 }, 0), 99);
+  assert.strictEqual(parseRecordAmount({ amount: 449 }, 0), 449);
+  assert.strictEqual(parseRecordAmount({ amount: 44900 }, 0), 449);
+  assert.strictEqual(parseRecordAmount({ amount: "₹449" }, 0), 449);
+  console.log("✓ All parseRecordAmount assertions passed!");
 
   const store = getStore();
 
@@ -27,7 +56,7 @@ async function runTests() {
     dedupeKey: "intern@example.com:python",
   };
   await store.createApplication(internshipRecord);
-  console.log("✓ Created ₹449 Internship application");
+  console.log("\n✓ Created ₹449 Internship application");
 
   // Test B: Create a hackathon application (₹99)
   const hackathonId = store.newId();
@@ -61,15 +90,15 @@ async function runTests() {
   console.log("✓ Store contains both applications");
 
   // Test D: Simulate internship filtering logic (as in GET /api/v1/admin/applications?type=internship)
-  const internshipRows = allRows.filter(r => r.domain !== "hack2skill" && r.amount !== 99);
-  assert.ok(internshipRows.every(r => r.domain !== "hack2skill" && r.amount !== 99), "No hackathon or 99rs records in internship view");
+  const internshipRows = allRows.filter(r => !isHackathonRecord(r));
+  assert.ok(internshipRows.every(r => !isHackathonRecord(r)), "No hackathon or 99rs records in internship view");
   assert.ok(internshipRows.some(r => r.applicationId === "APP-INTERN-001"), "Internship record present in internship filtered list");
   assert.ok(!internshipRows.some(r => r.applicationId === "APP-HACK-001"), "Hackathon record excluded from internship filtered list");
   console.log("✓ Internship filtering strictly excludes ₹99 Hackathon entries");
 
   // Test E: Simulate hackathon filtering logic (as in GET /api/v1/admin/applications?type=hackathon)
-  const hackathonRows = allRows.filter(r => r.domain === "hack2skill" || r.amount === 99);
-  assert.ok(hackathonRows.every(r => r.domain === "hack2skill" || r.amount === 99), "Only hackathon/99rs records in hackathon view");
+  const hackathonRows = allRows.filter(r => isHackathonRecord(r));
+  assert.ok(hackathonRows.every(r => isHackathonRecord(r)), "Only hackathon/99rs records in hackathon view");
   assert.ok(hackathonRows.some(r => r.applicationId === "APP-HACK-001"), "Hackathon record present in hackathon filtered list");
   assert.ok(!hackathonRows.some(r => r.applicationId === "APP-INTERN-001"), "Internship record excluded from hackathon filtered list");
   console.log("✓ Hackathon filtering strictly isolates ₹99 Hackathon entries");
