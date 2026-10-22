@@ -57,7 +57,7 @@ export function HackathonView() {
   return (
     <>
       {/* ================= HERO ================= */}
-      <section className="relative flex min-h-[88vh] items-center overflow-hidden pt-24 sm:pt-28">
+      <section className="relative overflow-hidden pt-24 pb-8 sm:pt-28 sm:pb-10">
         {/* animated grid + glow background */}
         <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
           <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(94,240,230,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(94,240,230,0.06)_1px,transparent_1px)] bg-[size:54px_54px] [mask-image:radial-gradient(ellipse_70%_60%_at_50%_35%,#000_55%,transparent_100%)]" />
@@ -82,7 +82,7 @@ export function HackathonView() {
               Kick To Tech Community
             </motion.p>
 
-            <motion.div variants={item} className="mt-5">
+            <motion.div variants={item} className="mt-4">
               <span className="inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-3.5 py-1.5 text-xs font-semibold text-accent">
                 <span className="relative flex h-2 w-2">
                   {!reduce && (
@@ -96,17 +96,17 @@ export function HackathonView() {
 
             <motion.h1
               variants={item}
-              className="mt-6 text-balance text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl md:text-6xl"
+              className="mt-4 sm:mt-5 text-balance text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl md:text-6xl"
             >
               Where <span className="text-gradient">Innovation</span> Meets Collaboration
             </motion.h1>
 
-            <motion.p variants={item} className="mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-muted">
+            <motion.p variants={item} className="mt-4 max-w-2xl text-pretty text-base sm:text-lg leading-relaxed text-muted">
               A new generation of builders, creators, and problem-solvers is coming together. Register for 
               PromptWars × KICK To TECH and turn ambitious ideas into real projects.
             </motion.p>
 
-            <motion.div variants={item} className="mt-9 flex flex-col gap-3 sm:flex-row">
+            <motion.div variants={item} className="mt-6 sm:mt-7 flex flex-col gap-3 sm:flex-row">
               <Button size="lg" onClick={handleRegisterClick}>
                 Register Now — {formatINR(HACKATHON_FEE)} <ArrowRight className="h-4 w-4" />
               </Button>
@@ -120,7 +120,7 @@ export function HackathonView() {
 
       {/* ================= HACK2SKILL FEATURED SECTION ================= */}
       {hack2skill && (
-        <Section id="hack2skill-featured" className="scroll-mt-24">
+        <Section id="hack2skill-featured" className="scroll-mt-20 pt-2 pb-16 sm:pt-4 sm:pb-20">
           <Container>
             <SectionHeading
               eyebrow="Featured"
@@ -133,7 +133,7 @@ export function HackathonView() {
               initial="hidden"
               whileInView="show"
               viewport={{ once: true, amount: 0.1 }}
-              className="mt-14"
+              className="mt-6 sm:mt-8"
             >
               {/* Poster + Info layout */}
               <motion.div variants={item} className="overflow-hidden rounded-3xl border border-accent/30 bg-surface">
