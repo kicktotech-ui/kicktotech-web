@@ -74,10 +74,12 @@ export interface AdminApplication {
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
   paymentMethod?: string;
+  kttId?: string;
 }
 
 export interface ApplicationQueryParams extends QueryParams {
   type?: "internship" | "hackathon" | "all";
+  confirmed?: boolean;
 }
 
 export const adminApplicationService = {
@@ -87,6 +89,7 @@ export const adminApplicationService = {
     q.set("page", String(params.page ?? 1));
     q.set("pageSize", String(params.pageSize ?? 10));
     if (params.type && params.type !== "all") q.set("type", params.type);
+    if (params.confirmed) q.set("confirmed", "true");
     const status = params.filters?.status;
     if (status) q.set("status", status);
     try {
@@ -105,6 +108,9 @@ export const adminApplicationService = {
 export const adminHackathonService = {
   async query(params: QueryParams = {}): Promise<Paginated<AdminApplication>> {
     return adminApplicationService.query({ ...params, type: "hackathon" });
+  },
+  async queryConfirmed(params: QueryParams = {}): Promise<Paginated<AdminApplication>> {
+    return adminApplicationService.query({ ...params, type: "hackathon", confirmed: true });
   },
   async decide(applicationId: string, action: "verify" | "reject", reason?: string): Promise<AdminApplication> {
     return adminApplicationService.decide(applicationId, action, reason);

@@ -29,7 +29,13 @@ export const navGroups: NavGroup[] = [
     label: "Programs",
     items: [
       { label: "Domains & Roadmaps", href: "/admin/domains", icon: BookOpen },
+    ],
+  },
+  {
+    label: "Hackathon Manager",
+    items: [
       { label: "Hackathon Manager", href: "/admin/hackathons", icon: Trophy },
+      { label: "Confirmed Registrations", href: "/admin/hackathons/confirmed", icon: BadgeCheck },
     ],
   },
   {
@@ -82,6 +88,7 @@ export const segmentLabels: Record<string, string> = {
   faculty: "Faculty",
   domains: "Domains & Roadmaps",
   hackathons: "Hackathon Manager",
+  confirmed: "Confirmed Registrations",
   sessions: "Live Sessions",
   attendance: "Attendance",
   payments: "Payments",

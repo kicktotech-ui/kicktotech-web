@@ -111,6 +111,7 @@ export default function HackathonManagerPage() {
       }
 
       const headers = [
+        "Unique ID",
         "Application ID",
         "Name",
         "Email",
@@ -130,6 +131,7 @@ export default function HackathonManagerPage() {
       for (const r of res.rows) {
         csvRows.push(
           [
+            `"${r.kttId || ""}"`,
             `"${r.applicationId || ""}"`,
             `"${(r.name || "").replace(/"/g, '""')}"`,
             `"${r.email || ""}"`,
@@ -163,6 +165,19 @@ export default function HackathonManagerPage() {
   }
 
   const columns: Column<AdminApplication>[] = [
+    {
+      key: "kttId",
+      header: "Unique ID",
+      sortable: true,
+      render: (r) =>
+        r.kttId ? (
+          <Badge tone="green" className="font-mono font-bold text-xs">
+            {r.kttId}
+          </Badge>
+        ) : (
+          <span className="text-xs text-adm-muted">—</span>
+        ),
+    },
     {
       key: "name",
       header: "Participant",

@@ -137,6 +137,8 @@ export interface ApplicationRecord {
   razorpayPaymentId?: string;
   razorpaySignature?: string;
   paymentMethod?: string;
+  /** Unique sequential identifier for confirmed hackathon participants (e.g. KTT01, KTT02) */
+  kttId?: string;
 }
 
 /**

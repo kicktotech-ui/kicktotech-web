@@ -7,7 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   PanelLeftClose, PanelLeft, Search, Command, Bell, LogOut, Menu, X, ChevronRight, HelpCircle,
 } from "lucide-react";
-import { navGroups, segmentLabels } from "./nav";
+import { navGroups, flatNav, segmentLabels } from "./nav";
 import { CommandPalette } from "./CommandPalette";
 import { useAdminAuth } from "./AdminAuth";
 import { useAdminTheme, ThemeSwitcher } from "./theme";
@@ -35,7 +35,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
   useEffect(() => { setMobileOpen(false); }, [pathname]);
 
-  const isActive = (href: string) => (href === "/admin" ? pathname === "/admin" : pathname === href || pathname.startsWith(href + "/"));
+  const isActive = (href: string) => {
+    if (href === "/admin") return pathname === "/admin";
+    if (pathname === href) return true;
+    if (flatNav.some((item) => item.href === pathname)) return false;
+    return pathname.startsWith(href + "/");
+  };
 
   const crumbs = pathname.split("/").filter(Boolean);
 
