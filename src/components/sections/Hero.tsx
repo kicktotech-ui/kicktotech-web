@@ -44,7 +44,7 @@ export function Hero() {
             custom={2} variants={fade} initial="hidden" animate="show"
             className="mx-auto mt-6 max-w-xl text-pretty text-base leading-relaxed text-muted sm:text-lg lg:mx-0"
           >
-            Kick To Tech bridges education and employability — connecting students,
+            KICK To TECH — An Edutech start-up Building student talent infrastructure — connecting students,
             colleges, and companies through workshops, hackathons, mentorship, and
             industry-grade internships.
           </motion.p>
