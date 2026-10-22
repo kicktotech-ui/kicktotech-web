@@ -29,7 +29,11 @@ import { Button } from "@/components/ui/Button";
 export function LoginView() {
   const router = useRouter();
   const params = useSearchParams();
-  const redirect = params.get("redirect") || "/internship/dashboard";
+  const rawRedirect = params.get("redirect");
+  const redirect =
+    rawRedirect && rawRedirect.startsWith("/") && !rawRedirect.startsWith("//")
+      ? rawRedirect
+      : "/internship/dashboard";
   const { refresh } = useAuth();
 
   const [email, setEmail] = useState("");

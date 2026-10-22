@@ -62,12 +62,15 @@ export interface HackathonSubmitResult {
 
 export async function submitHackathonApplication(
   input: HackathonApplicationInput,
+  authenticatedEmail: string,
 ): Promise<HackathonSubmitResult> {
   const store = getStore();
   const cfg = getHackathonPaymentConfig();
-  const dedupeKey = dedupeKeyFor(input.email);
+  // Authoritative identity from authenticated session — never trust client-supplied email
+  const verifiedEmail = authenticatedEmail.trim().toLowerCase();
+  const dedupeKey = dedupeKeyFor(verifiedEmail);
 
-  // Idempotent: same email for hack2skill reuses the record (unless rejected).
+  // Idempotent: same verified email for hack2skill reuses the record (unless rejected).
   let application = await store.getApplicationByDedupeKey(dedupeKey);
   let duplicate = false;
 
@@ -85,7 +88,7 @@ export async function submitHackathonApplication(
       id: store.newId(),
       applicationId: makeAppId(),
       name: input.name,
-      email: input.email,
+      email: verifiedEmail,
       phone: input.phone,
       college: input.college,
       // Hackathon-specific fields stored in optional ApplicationRecord fields
@@ -119,7 +122,8 @@ export async function submitHackathonApplication(
  *
  * 1. Looks up the application by human-readable applicationId.
  * 2. Validates it is a hack2skill application.
- * 3. Transitions status to PAYMENT_PROOF_SUBMITTED (if not already past that).
+ * 3. Validates that the authenticated user owns this application.
+ * 4. Transitions status to PAYMENT_PROOF_SUBMITTED (if not already past that).
  *
  * NOTE: The confirmation email (Template #5) is NOT sent here. It is triggered
  * only by the admin payment-verification workflow in applications.ts
@@ -128,6 +132,7 @@ export async function submitHackathonApplication(
  */
 export async function submitHackathonPaymentProof(
   applicationId: string,
+  authenticatedEmail?: string,
 ): Promise<{ application: ApplicationRecord }> {
   const store = getStore();
   const app = await store.getApplicationByAppId(applicationId);
@@ -136,6 +141,11 @@ export async function submitHackathonPaymentProof(
   // Only handle hack2skill applications through this path.
   if (app.domain !== HACK2SKILL_EVENT) {
     throw new AppError("VALIDATION_ERROR", "This endpoint is only for Hack2Skill applications.");
+  }
+
+  // Validate ownership if authenticated email is provided
+  if (authenticatedEmail && app.email.trim().toLowerCase() !== authenticatedEmail.trim().toLowerCase()) {
+    throw new AppError("FORBIDDEN", "You are not authorized to submit payment proof for this application.");
   }
 
   // Transition status (idempotent — skip if already at or past PROOF_SUBMITTED).

@@ -1,19 +1,24 @@
 import { route, ok, parseJson } from "@/server/http";
 import { hackathonApplicationSchema } from "@/server/validation";
 import { submitHackathonApplication } from "@/server/hackathonApplications";
+import { requireAuthenticatedStudent } from "@/server/auth/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Public: create (or idempotently reuse) a Hack2Skill hackathon application
- * and return the manual UPI payment info (₹99). This does NOT take payment —
- * it records the application in PAYMENT_PENDING and hands back UPI + WhatsApp
- * details.
+ * Protected: Create (or idempotently reuse) a PromptWars × KICK To TECH hackathon
+ * application for the authenticated student, returning manual UPI payment info (₹99).
+ *
+ * Enforces session/token authentication. Never trusts client-supplied identity.
  */
 export const POST = route(async (req, { requestId }) => {
+  const authUser = await requireAuthenticatedStudent(req);
   const input = await parseJson(req, hackathonApplicationSchema);
-  const { application, duplicate, payment, whatsappUrl } = await submitHackathonApplication(input);
+  const { application, duplicate, payment, whatsappUrl } = await submitHackathonApplication(
+    input,
+    authUser.email,
+  );
   return ok(
     {
       applicationId: application.applicationId,

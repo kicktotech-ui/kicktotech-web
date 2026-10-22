@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Check, Loader2, ArrowRight, ArrowLeft, ShieldCheck, Copy,
   MessageCircle, Clock, BadgeCheck, ExternalLink, CheckCircle2,
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
+import { useAuth } from "@/components/providers";
 import { Container, Section } from "@/components/ui";
 import { Button } from "@/components/ui/Button";
 import { FormField, Input } from "@/components/forms/fields";
@@ -31,6 +32,7 @@ interface ApplyResponse {
 type Phase = "form" | "pay" | "proof" | "submitted";
 
 export function Hack2SkillRegisterFlow() {
+  const { user, firebaseUser } = useAuth();
   const [phase, setPhase] = useState<Phase>("form");
   const [step, setStep] = useState(0);
   const [personal, setPersonal] = useState({ name: "", email: "", phone: "" });
@@ -41,6 +43,23 @@ export function Hack2SkillRegisterFlow() {
   const [error, setError] = useState<string | null>(null);
   const [applied, setApplied] = useState<ApplyResponse | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // Pre-fill fields from authenticated profile
+  useEffect(() => {
+    if (user) {
+      setPersonal((p) => ({
+        name: p.name || user.name || "",
+        email: user.email || p.email,
+        phone: p.phone || user.phone || "",
+      }));
+      if (user.college) {
+        setAcademic((a) => ({
+          ...a,
+          college: a.college || user.college || "",
+        }));
+      }
+    }
+  }, [user]);
 
   const markTouched = (key: string) => setTouched((t) => ({ ...t, [key]: true }));
 
@@ -73,11 +92,24 @@ export function Hack2SkillRegisterFlow() {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await api.post<ApplyResponse>("/hackathon/apply", {
-        name: personal.name, email: personal.email, phone: personal.phone,
-        college: academic.college, course: academic.course, year: academic.year,
-        teamName: academic.teamName || undefined,
-      });
+      const token = firebaseUser ? await firebaseUser.getIdToken() : undefined;
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      const res = await api.post<ApplyResponse>(
+        "/hackathon/apply",
+        {
+          name: personal.name,
+          email: user?.email || personal.email,
+          phone: personal.phone,
+          college: academic.college,
+          course: academic.course,
+          year: academic.year,
+          teamName: academic.teamName || undefined,
+        },
+        { headers },
+      );
       setApplied(res);
       setPhase("pay");
     } catch (e) {
@@ -85,7 +117,7 @@ export function Hack2SkillRegisterFlow() {
     } finally {
       setSubmitting(false);
     }
-  }, [personal, academic]);
+  }, [personal, academic, user, firebaseUser]);
 
   const copyUpi = useCallback(async () => {
     if (!applied) return;
@@ -102,9 +134,15 @@ export function Hack2SkillRegisterFlow() {
     setError(null);
     // Record proof-submitted server-side (no email is triggered here).
     try {
+      const token = firebaseUser ? await firebaseUser.getIdToken() : undefined;
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
       await api.post<{ status: string }>(
         "/hackathon/apply/proof",
         { applicationId: applied.applicationId },
+        { headers },
       );
     } catch (e) {
       console.warn("[hack2skill] proof submission failed:", e);
@@ -112,7 +150,7 @@ export function Hack2SkillRegisterFlow() {
     if (applied.whatsappUrl) window.open(applied.whatsappUrl, "_blank");
     setPhase("submitted");
     setSendingProof(false);
-  }, [applied, sendingProof]);
+  }, [applied, sendingProof, firebaseUser]);
 
   return (
     <Section className="pt-8">
@@ -145,8 +183,23 @@ export function Hack2SkillRegisterFlow() {
                   <FormField label="Full name" htmlFor="h-name" error={errOf("name")}>
                     <Input id="h-name" value={personal.name} invalid={Boolean(errOf("name"))} onBlur={() => markTouched("name")} onChange={(e) => setPersonal({ ...personal, name: e.target.value })} placeholder="Your full name" />
                   </FormField>
-                  <FormField label="Email ID" htmlFor="h-email" error={errOf("email")}>
-                    <Input id="h-email" type="email" value={personal.email} invalid={Boolean(errOf("email"))} onBlur={() => markTouched("email")} onChange={(e) => setPersonal({ ...personal, email: e.target.value })} placeholder="you@example.com" />
+                  <FormField
+                    label="Email ID"
+                    htmlFor="h-email"
+                    error={errOf("email")}
+                    hint={user?.email ? "Linked to your signed-in KICK To TECH account." : undefined}
+                  >
+                    <Input
+                      id="h-email"
+                      type="email"
+                      value={personal.email}
+                      disabled={Boolean(user?.email)}
+                      readOnly={Boolean(user?.email)}
+                      invalid={Boolean(errOf("email"))}
+                      onBlur={() => markTouched("email")}
+                      onChange={(e) => setPersonal({ ...personal, email: e.target.value })}
+                      placeholder="you@example.com"
+                    />
                   </FormField>
                   <FormField label="Phone number" htmlFor="h-phone" error={errOf("phone")}>
                     <Input id="h-phone" type="tel" value={personal.phone} invalid={Boolean(errOf("phone"))} onBlur={() => markTouched("phone")} onChange={(e) => setPersonal({ ...personal, phone: e.target.value })} placeholder="+91 98765 43210" />

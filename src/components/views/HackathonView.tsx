@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import {
   Sparkles, Trophy, ArrowRight, Users, CalendarDays, MapPin, Target,
@@ -10,10 +11,11 @@ import {
 } from "lucide-react";
 import { Container, Section, Badge, SectionHeading } from "@/components/ui";
 import { Button } from "@/components/ui/Button";
+import { useAuth } from "@/components/providers";
 import { hackathons, type HackathonEntry } from "@/data/mock/hackathons";
 import { easePremium } from "@/lib/motion";
 import { cn, formatINR } from "@/lib/utils";
-import { HackathonAuthModal } from "./HackathonAuthModal";
+import { HackathonLoginModal } from "./HackathonLoginModal";
 
 /** Where "Join the Community" points — the real, existing community page. */
 const COMMUNITY_HREF = "/join";
@@ -21,8 +23,18 @@ const COMMUNITY_HREF = "/join";
 const HACKATHON_FEE = 99;
 
 export function HackathonView() {
+  const router = useRouter();
+  const { user } = useAuth();
   const reduce = useReducedMotion();
-  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+
+  const handleRegisterClick = useCallback(() => {
+    if (user) {
+      router.push("/hackathon/register");
+    } else {
+      setLoginModalOpen(true);
+    }
+  }, [user, router]);
 
   const container: Variants = {
     hidden: {},
@@ -95,7 +107,7 @@ export function HackathonView() {
             </motion.p>
 
             <motion.div variants={item} className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <Button size="lg" onClick={() => setAuthModalOpen(true)}>
+              <Button size="lg" onClick={handleRegisterClick}>
                 Register Now — {formatINR(HACKATHON_FEE)} <ArrowRight className="h-4 w-4" />
               </Button>
               <Button size="lg" variant="outline" onClick={scrollToHackathons}>
@@ -183,7 +195,7 @@ export function HackathonView() {
                         <p className="text-3xl font-extrabold text-accent">{formatINR(HACKATHON_FEE)}</p>
                         <p className="mt-1 text-xs text-muted">Registration Fee</p>
                       </div>
-                      <Button size="lg" className="w-full" onClick={() => setAuthModalOpen(true)}>
+                      <Button size="lg" className="w-full" onClick={handleRegisterClick}>
                         Register Now <ArrowRight className="h-4 w-4" />
                       </Button>
                       <p className="text-[11px] text-muted">Limited slots • Don&apos;t miss out!</p>
@@ -323,7 +335,7 @@ export function HackathonView() {
                 Register for PromptWars × KICK To TECH now or join the community to stay updated on upcoming hackathons and events.
               </p>
               <div className="mt-7 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-                <Button size="lg" onClick={() => setAuthModalOpen(true)}>
+                <Button size="lg" onClick={handleRegisterClick}>
                   Register for PromptWars <ArrowRight className="h-4 w-4" />
                 </Button>
                 <Button href={COMMUNITY_HREF} variant="outline" size="lg">
@@ -334,8 +346,8 @@ export function HackathonView() {
           </div>
         </Container>
       </Section>
-      {/* Auth Modal */}
-      <HackathonAuthModal open={authModalOpen} onClose={() => setAuthModalOpen(false)} />
+      {/* Login Required Modal */}
+      <HackathonLoginModal open={loginModalOpen} onClose={() => setLoginModalOpen(false)} />
     </>
   );
 }
