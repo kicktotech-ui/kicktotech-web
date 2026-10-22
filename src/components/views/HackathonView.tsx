@@ -161,7 +161,7 @@ export function HackathonView() {
                           <Zap className="h-3.5 w-3.5" /> Registration Open
                         </span>
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-xs font-medium text-muted">
-                          {formatINR(HACKATHON_FEE)} Registration Fee
+                          {formatINR(HACKATHON_FEE)} Participant Kit & Refreshment Fee
                         </span>
                       </div>
                       <h3 className="mt-4 text-2xl font-bold sm:text-3xl">PromptWars × KICK To TECH</h3>
@@ -193,7 +193,7 @@ export function HackathonView() {
                       </div>
                       <div>
                         <p className="text-3xl font-extrabold text-accent">{formatINR(HACKATHON_FEE)}</p>
-                        <p className="mt-1 text-xs text-muted">Registration Fee</p>
+                        <p className="mt-1 text-xs text-muted">Participant Kit & Refreshment Fee</p>
                       </div>
                       <Button size="lg" className="w-full" onClick={handleRegisterClick}>
                         Register Now <ArrowRight className="h-4 w-4" />

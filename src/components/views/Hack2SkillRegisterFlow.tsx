@@ -202,7 +202,7 @@ export function Hack2SkillRegisterFlow() {
           amount: order.amount,
           currency: order.currency,
           name: "KICK To TECH",
-          description: "PromptWars × KICK To TECH Registration Fee",
+          description: "PromptWars × KICK To TECH Participant Kit & Refreshment Fee",
           order_id: order.orderId,
           prefill: {
             name: personal.name,
@@ -460,7 +460,7 @@ export function Hack2SkillRegisterFlow() {
                       ...(academic.year ? [["Year", academic.year]] : []),
                       ...(academic.teamName ? [["Team name", academic.teamName]] : []),
                       ["Event", "PromptWars × KICK To TECH"],
-                      ["Registration fee", formatINR(HACKATHON_FEE)],
+                      ["Participant Kit & Refreshment Fee", formatINR(HACKATHON_FEE)],
                     ].map(([k, v]) => (
                       <div key={k} className="flex justify-between gap-4 p-4 text-sm">
                         <dt className="text-muted">{k}</dt>
@@ -677,7 +677,7 @@ export function Hack2SkillRegisterFlow() {
                       ✓
                     </span>
                     <span>
-                      Your ₹99 registration fee is already verified with KICK To TECH. Join the event and form your team!
+                      Your ₹99 participant kit & refreshment fee is already verified with KICK To TECH. Join the event and form your team!
                     </span>
                   </div>
                 </div>

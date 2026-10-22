@@ -46,7 +46,7 @@ function getHackathonPaymentConfig() {
   return {
     ...base,
     amount,
-    note: process.env.HACKATHON_PAYMENT_NOTE?.trim() || "PromptWars × KICK To TECH registration fee",
+    note: process.env.HACKATHON_PAYMENT_NOTE?.trim() || "PromptWars × KICK To TECH participant kit & refreshment fee",
     messageTemplate:
       process.env.HACKATHON_WHATSAPP_TEMPLATE?.trim() ||
       "Hello, I have completed the PromptWars registration payment.\n\nName: {name}\nApplication ID: {applicationId}\nAmount: ₹{amount}",

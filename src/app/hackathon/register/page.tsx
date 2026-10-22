@@ -6,7 +6,7 @@ import { RequireAuth } from "@/components/dashboard/RequireAuth";
 
 export const metadata: Metadata = {
   title: "PromptWars × KICK To TECH Registration",
-  description: "Register for PromptWars × KICK To TECH — Build with AI, 28 October 2026 at JSPM University, Pune. ₹99 registration fee.",
+  description: "Register for PromptWars × KICK To TECH — Build with AI, 28 October 2026 at JSPM University, Pune. ₹99 participant kit & refreshment fee.",
 };
 
 export default function HackathonRegisterPage() {
