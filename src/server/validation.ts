@@ -117,3 +117,44 @@ export type StudentRegisterInput = z.infer<typeof studentRegisterSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type IssueCertificateInput = z.infer<typeof issueCertificateSchema>;
 export type RevokeCertificateInput = z.infer<typeof revokeCertificateSchema>;
+
+export const hackathonScheduleItemSchema = z.object({
+  id: z.string(),
+  time: z.string(),
+  title: z.string(),
+  description: z.string().optional(),
+  status: z.enum(["upcoming", "live", "completed"]).optional(),
+});
+
+export const hackathonResourceItemSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  url: z.string(),
+  description: z.string().optional(),
+  type: z.enum(["link", "document", "code", "community"]).optional(),
+});
+
+export const hackathonDashboardConfigSchema = z.object({
+  eventName: z.string().optional(),
+  tagline: z.string().optional(),
+  description: z.string().optional(),
+  date: z.string().optional(),
+  time: z.string().optional(),
+  reportingTime: z.string().optional(),
+  venue: z.string().optional(),
+  mode: z.string().optional(),
+  theme: z.string().optional(),
+  prizePool: z.string().optional(),
+  announcement: z.string().optional(),
+  announcementActive: z.boolean().optional(),
+  whatsappGroupUrl: z.string().optional(),
+  discordUrl: z.string().optional(),
+  officialPortalUrl: z.string().optional(),
+  submissionUrl: z.string().optional(),
+  contactEmail: z.string().optional(),
+  contactPhone: z.string().optional(),
+  schedule: z.array(hackathonScheduleItemSchema).optional(),
+  resources: z.array(hackathonResourceItemSchema).optional(),
+});
+
+export type HackathonDashboardConfigInput = z.infer<typeof hackathonDashboardConfigSchema>;

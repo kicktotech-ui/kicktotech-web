@@ -6,6 +6,7 @@ import type {
   Payment, Activation, Certificate, AdminNotification, EmailCampaign, ActivityLog,
   DashboardData, SystemService, AdminUser, Role, Permission, Paginated, QueryParams,
 } from "@/lib/admin/types";
+import type { HackathonDashboardConfig } from "@/types";
 
 /**
  * API-backed repository → GET /api/v1/admin/data/:collection (real Firestore,
@@ -137,6 +138,12 @@ export const adminHackathonService = {
   },
   async syncGoogleSheets(): Promise<GoogleSheetsSyncResponse> {
     return api.post<GoogleSheetsSyncResponse>("/admin/hackathons/sheets", {});
+  },
+  async getDashboardConfig(): Promise<HackathonDashboardConfig> {
+    return api.get<HackathonDashboardConfig>("/admin/hackathons/dashboard-config");
+  },
+  async updateDashboardConfig(patch: Partial<HackathonDashboardConfig>): Promise<HackathonDashboardConfig> {
+    return api.post<HackathonDashboardConfig>("/admin/hackathons/dashboard-config", patch);
   },
 };
 export const mentorService = apiRepository<Mentor>("mentors");

@@ -22,8 +22,10 @@ import {
   Sparkles,
   ExternalLink,
   RefreshCw,
+  LayoutDashboard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { HackathonDashboardEdit } from "@/components/admin/HackathonDashboardEdit";
 
 const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1jeMYVFs4l_cx8-pkfgfSI1vUd4fYTWnwMyV0u0Ksuvw/edit?usp=sharing";
 
@@ -45,6 +47,7 @@ const STATUS_LABEL: Record<AdminApplicationStatus, string> = {
 
 export default function HackathonManagerPage() {
   const toast = useToast();
+  const [activeTab, setActiveTab] = useState<"registrations" | "dashboard-edit">("registrations");
   const [refreshKey, setRefreshKey] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -322,7 +325,7 @@ export default function HackathonManagerPage() {
     <div>
       <PageHeader
         title="Hackathon Manager"
-        subtitle="Track PromptWars × KICK To TECH ₹99 registrations, Razorpay transactions, and participant details."
+        subtitle="Manage PromptWars × KICK To TECH ₹99 registrations, edit the participant dashboard, and sync records."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -352,51 +355,94 @@ export default function HackathonManagerPage() {
         }
       />
 
-      {/* Metrics Cards */}
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard
-          label="Total Registrations"
-          value={stats.total}
-          accent="#0057ff"
-        />
-        <StatCard
-          label="Paid / Verified"
-          value={stats.paid}
-          accent="#16a34a"
-        />
-        <StatCard
-          label="Pending Payments"
-          value={stats.pending}
-          accent="#f5c400"
-        />
-        <StatCard
-          label="Hackathon Revenue"
-          value={stats.revenue}
-          format="currency"
-          accent="#16a34a"
-        />
+      {/* Primary Section Switcher Tabs */}
+      <div className="mb-6 flex border-b border-adm-border pb-px">
+        <button
+          type="button"
+          onClick={() => setActiveTab("registrations")}
+          className={cn(
+            "flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-semibold transition-colors",
+            activeTab === "registrations"
+              ? "border-[#f5c400] text-adm-fg bg-adm-surface2/60 font-bold"
+              : "border-transparent text-adm-muted hover:text-adm-fg hover:bg-adm-surface2/30",
+          )}
+        >
+          <Users className="h-4 w-4 text-accent" />
+          Participants & Registrations
+          <Badge tone="blue" className="ml-1 font-mono">
+            {stats.total}
+          </Badge>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("dashboard-edit")}
+          className={cn(
+            "flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-semibold transition-colors",
+            activeTab === "dashboard-edit"
+              ? "border-[#f5c400] text-adm-fg bg-adm-surface2/60 font-bold"
+              : "border-transparent text-adm-muted hover:text-adm-fg hover:bg-adm-surface2/30",
+          )}
+        >
+          <LayoutDashboard className="h-4 w-4 text-accent" />
+          Hackathon Dashboard Edit
+          <Badge tone="green" className="ml-1">
+            Live Sync
+          </Badge>
+        </button>
       </div>
 
-      {/* Table */}
-      <DataTable
-        columns={columns}
-        fetcher={(p) => adminHackathonService.query(p)}
-        searchPlaceholder="Search participant, email, phone, college, team name..."
-        refreshKey={refreshKey}
-        filters={[
-          {
-            key: "status",
-            label: "All statuses",
-            options: [
-              { value: "PAYMENT_VERIFIED", label: "Verified / Paid" },
-              { value: "PAYMENT_PENDING", label: "Payment Pending" },
-              { value: "PAYMENT_PROOF_SUBMITTED", label: "Proof Submitted" },
-              { value: "PAYMENT_REJECTED", label: "Rejected" },
-            ],
-          },
-        ]}
-        emptyTitle="No hackathon registrations yet"
-      />
+      {activeTab === "dashboard-edit" ? (
+        <HackathonDashboardEdit />
+      ) : (
+        <>
+          {/* Metrics Cards */}
+          <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <StatCard
+              label="Total Registrations"
+              value={stats.total}
+              accent="#0057ff"
+            />
+            <StatCard
+              label="Paid / Verified"
+              value={stats.paid}
+              accent="#16a34a"
+            />
+            <StatCard
+              label="Pending Payments"
+              value={stats.pending}
+              accent="#f5c400"
+            />
+            <StatCard
+              label="Hackathon Revenue"
+              value={stats.revenue}
+              format="currency"
+              accent="#16a34a"
+            />
+          </div>
+
+          {/* Table */}
+          <DataTable
+            columns={columns}
+            fetcher={(p) => adminHackathonService.query(p)}
+            searchPlaceholder="Search participant, email, phone, college, team name..."
+            refreshKey={refreshKey}
+            filters={[
+              {
+                key: "status",
+                label: "All statuses",
+                options: [
+                  { value: "PAYMENT_VERIFIED", label: "Verified / Paid" },
+                  { value: "PAYMENT_PENDING", label: "Payment Pending" },
+                  { value: "PAYMENT_PROOF_SUBMITTED", label: "Proof Submitted" },
+                  { value: "PAYMENT_REJECTED", label: "Rejected" },
+                ],
+              },
+            ]}
+            emptyTitle="No hackathon registrations yet"
+          />
+        </>
+      )}
     </div>
   );
 }

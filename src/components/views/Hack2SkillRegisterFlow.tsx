@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import {
   Check, Loader2, ArrowRight, ArrowLeft, ShieldCheck,
   CreditCard, AlertCircle, ExternalLink, CheckCircle2, RefreshCw,
+  LayoutDashboard,
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/components/providers";
@@ -699,9 +700,19 @@ export function Hack2SkillRegisterFlow() {
                 </div>
               </div>
 
-              <div className="mt-8">
-                <Button variant="ghost" onClick={() => (window.location.href = "/hackathon")}>
-                  Return to Hackathons
+              <div className="mt-8 flex flex-wrap items-center gap-3">
+                <Button
+                  onClick={() => (window.location.href = "/internship/dashboard?tab=hackathon")}
+                  className="shadow-lg shadow-accent/20"
+                >
+                  <LayoutDashboard className="h-4 w-4" />
+                  Hackathon Dashboard
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => (window.location.href = "/hackathon")}
+                >
+                  Return to Hackathons Overview
                 </Button>
               </div>
             </div>

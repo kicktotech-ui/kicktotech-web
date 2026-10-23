@@ -189,3 +189,62 @@ export interface Stat {
   value: number;
   suffix?: string;
 }
+
+export interface HackathonScheduleItem {
+  id: string;
+  time: string;
+  title: string;
+  description?: string;
+  status?: "upcoming" | "live" | "completed";
+}
+
+export interface HackathonResourceItem {
+  id: string;
+  title: string;
+  url: string;
+  description?: string;
+  type?: "link" | "document" | "code" | "community";
+}
+
+export interface HackathonDashboardConfig {
+  eventName: string;
+  tagline: string;
+  description: string;
+  date: string;
+  time: string;
+  reportingTime: string;
+  venue: string;
+  mode: string;
+  theme: string;
+  prizePool: string;
+  announcement?: string;
+  announcementActive?: boolean;
+  whatsappGroupUrl?: string;
+  discordUrl?: string;
+  officialPortalUrl?: string;
+  submissionUrl?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  schedule: HackathonScheduleItem[];
+  resources: HackathonResourceItem[];
+  updatedAt?: string;
+}
+
+export interface HackathonParticipantRecord {
+  id: string;
+  applicationId: string;
+  kttId?: string;
+  name: string;
+  email: string;
+  phone: string;
+  college?: string;
+  course?: string;
+  year?: string;
+  teamName?: string;
+  amount: number;
+  status: "PAYMENT_PENDING" | "PAYMENT_PROOF_SUBMITTED" | "PAYMENT_VERIFIED" | "PAYMENT_REJECTED" | "CERTIFICATE_ISSUED";
+  razorpayPaymentId?: string;
+  razorpayOrderId?: string;
+  createdAt: string;
+}
+
