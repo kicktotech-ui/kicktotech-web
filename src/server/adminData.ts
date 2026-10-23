@@ -164,12 +164,25 @@ const mapApplication = (id: string, d: Doc): Application => ({
   reviewNote: d.reviewNote ? str(d.reviewNote) : undefined,
 });
 
+const mapPayment = (id: string, d: Doc): Record<string, unknown> => ({
+  id,
+  paymentId: str(d.razorpayPaymentId || d.razorpay_payment_id || d.paymentId || id),
+  orderId: str(d.razorpayOrderId || d.razorpay_order_id || d.orderId || ""),
+  internName: str(d.name || d.fullName || d.applicantName || "Student"),
+  internEmail: str(d.email || d.userEmail || ""),
+  amount: num(d.amount) || (d.batch === "batch-1-may-jun-2026" ? 222 : 449),
+  status: payStatus(d.paymentStatus || d.status),
+  method: str(d.paymentMethod || d.method || "UPI / Online"),
+  createdAt: iso(d.createdAt || d.appliedAt || d.paidAt || new Date().toISOString()),
+});
+
 interface Mapped { collection: string; map: (id: string, d: Doc) => Record<string, unknown>; searchable: (row: Record<string, unknown>) => string[] }
 
 // Only collections that genuinely exist in Firestore are mapped. Others → empty.
 const REGISTRY: Record<string, Mapped> = {
   interns: { collection: "interns", map: mapIntern as unknown as Mapped["map"], searchable: (r) => [r.name, r.email, r.phone, r.internId, r.college].map(String) },
   applications: { collection: "registrations", map: mapApplication as unknown as Mapped["map"], searchable: (r) => [r.name, r.email, r.phone, r.college].map(String) },
+  payments: { collection: "registrations", map: mapPayment, searchable: (r) => [r.paymentId, r.orderId, r.internName, r.internEmail, r.method].map(String) },
   certificates: { collection: "certificates", map: mapCert as unknown as Mapped["map"], searchable: (r) => [r.certificateId, r.internName, r.internRef, r.internEmail, r.program].map(String) },
   mentors: { collection: "mentor_users", map: mapMentor as unknown as Mapped["map"], searchable: (r) => [r.name, r.email].map(String) },
   activations: { collection: "manual_activations", map: mapActivation as unknown as Mapped["map"], searchable: (r) => [r.code, r.internName, r.internEmail].map(String) },
@@ -215,32 +228,41 @@ export async function queryCollection(name: string, opts: QueryOpts): Promise<Qu
   const def = REGISTRY[name];
   if (!def) return { rows: [], total: 0, row: opts.id ? null : undefined };
 
-  const db = await getAdminDb();
-  const colRef = db.collection(def.collection);
+  try {
+    const db = await getAdminDb();
+    const colRef = db.collection(def.collection);
 
-  if (opts.id) {
-    const doc = await colRef.doc(opts.id).get();
-    return { rows: [], total: doc.exists ? 1 : 0, row: doc.exists ? def.map(doc.id, doc.data() as Doc) : null };
+    if (opts.id) {
+      const doc = await colRef.doc(opts.id).get();
+      return { rows: [], total: doc.exists ? 1 : 0, row: doc.exists ? def.map(doc.id, doc.data() as Doc) : null };
+    }
+
+    const hasSearch = Boolean(opts.search);
+    const hasFilter = Object.values(opts.filters ?? {}).some(Boolean);
+
+    // Fast path — no search/filter: server-side pagination, minimal reads.
+    if (!hasSearch && !hasFilter) {
+      try {
+        const countSnap = await colRef.count().get();
+        const total = countSnap.data().count;
+        const offset = (opts.page - 1) * opts.pageSize;
+        const pageSnap = await colRef.offset(offset).limit(opts.pageSize).get();
+        const rows = pageSnap.docs.map((d) => def.map(d.id, d.data() as Doc));
+        return { rows, total };
+      } catch (err) {
+        console.warn(`[adminData] Fast path failed for ${name}, trying bounded scan:`, err);
+      }
+    }
+
+    // Search/filter path — bounded scan, filtered + paginated in memory.
+    const scan = await colRef.limit(MAX_SCAN).get();
+    const mapped = scan.docs.map((d) => def.map(d.id, d.data() as Doc));
+    const filtered = applyFilters(mapped, def, opts);
+    const total = filtered.length;
+    const start = (opts.page - 1) * opts.pageSize;
+    return { rows: filtered.slice(start, start + opts.pageSize), total };
+  } catch (err) {
+    console.error(`[adminData] queryCollection error for ${name}:`, err);
+    return { rows: [], total: 0, row: opts.id ? null : undefined };
   }
-
-  const hasSearch = Boolean(opts.search);
-  const hasFilter = Object.values(opts.filters ?? {}).some(Boolean);
-
-  // Fast path — no search/filter: server-side pagination, minimal reads.
-  if (!hasSearch && !hasFilter) {
-    const countSnap = await colRef.count().get();
-    const total = countSnap.data().count;
-    const offset = (opts.page - 1) * opts.pageSize;
-    const pageSnap = await colRef.offset(offset).limit(opts.pageSize).get();
-    const rows = pageSnap.docs.map((d) => def.map(d.id, d.data() as Doc));
-    return { rows, total };
-  }
-
-  // Search/filter path — bounded scan, filtered + paginated in memory.
-  const scan = await colRef.limit(MAX_SCAN).get();
-  const mapped = scan.docs.map((d) => def.map(d.id, d.data() as Doc));
-  const filtered = applyFilters(mapped, def, opts);
-  const total = filtered.length;
-  const start = (opts.page - 1) * opts.pageSize;
-  return { rows: filtered.slice(start, start + opts.pageSize), total };
 }

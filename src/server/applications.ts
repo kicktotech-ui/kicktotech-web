@@ -9,6 +9,7 @@ import { sendBrevoTemplateEmail } from "./email/brevo";
 import { sendHackathonConfirmationEmail } from "./hackathonApplications";
 import { syncConfirmedHackathonParticipant } from "./integrations/googleSheets";
 import { getAdminDb, isAdminConfigured } from "./firebase/admin";
+import { invalidateApplicationsCache } from "./data/firebase";
 
 /*
  * Internship application service — the manual UPI + WhatsApp payment gate.
@@ -108,6 +109,7 @@ export async function getApplication(applicationId: string): Promise<Application
 
 /** Admin manually verifies the payment → PAYMENT_VERIFIED (issuance unlocked). */
 export async function verifyPayment(applicationId: string, meta: { actor: string; requestId: string }): Promise<ApplicationRecord> {
+  invalidateApplicationsCache();
   const store = getStore();
   const app = await store.getApplicationByAppId(applicationId);
   if (!app) throw new AppError("NOT_FOUND", "Application not found.");
@@ -135,6 +137,7 @@ export async function verifyPayment(applicationId: string, meta: { actor: string
 
 /** Admin rejects the payment proof → PAYMENT_REJECTED. */
 export async function rejectPayment(applicationId: string, reason: string | undefined, meta: { actor: string; requestId: string }): Promise<ApplicationRecord> {
+  invalidateApplicationsCache();
   const store = getStore();
   const app = await store.getApplicationByAppId(applicationId);
   if (!app) throw new AppError("NOT_FOUND", "Application not found.");
@@ -170,6 +173,7 @@ export async function grantInternshipAccess(
   applicationId: string,
   meta: { actor: string; requestId: string }
 ): Promise<AccessGrantResult> {
+  invalidateApplicationsCache();
   const store = getStore();
   const app = await store.getApplicationByAppId(applicationId);
   if (!app) throw new AppError("NOT_FOUND", "Application not found.");
@@ -265,6 +269,7 @@ export async function updateApplicationDetails(
   patch: Partial<ApplicationRecord>,
   meta: { actor: string; requestId: string }
 ): Promise<ApplicationRecord> {
+  invalidateApplicationsCache();
   const store = getStore();
   const app = await store.getApplicationByAppId(applicationId);
   if (!app) throw new AppError("NOT_FOUND", "Application not found.");
@@ -305,6 +310,7 @@ export async function createAdminApplication(
   input: AdminCreateApplicationInput,
   meta: { actor: string; requestId: string }
 ): Promise<AccessGrantResult> {
+  invalidateApplicationsCache();
   const store = getStore();
   const domain = input.domain.trim();
   const mentor = input.mentorId ? { id: input.mentorId, name: input.mentorName || "" } : resolveMentorForDomain(normalizeCertificateDomain(domain));

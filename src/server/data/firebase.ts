@@ -287,6 +287,14 @@ function mapLegacyApplication(id: string, d: Doc): ApplicationRecord {
   };
 }
 
+// In-memory cache for aggregated applications to keep response times <500ms
+let _appsCache: { data: ApplicationRecord[]; timestamp: number } | null = null;
+const CACHE_TTL_MS = 20_000; // 20s TTL
+
+export function invalidateApplicationsCache() {
+  _appsCache = null;
+}
+
 export function createFirebaseStore(): DataStore {
   return {
     newId: () => uuid(),
@@ -480,6 +488,7 @@ export function createFirebaseStore(): DataStore {
 
     // ---- applications — WRITE namespaced (ktt_applications) + READ fallback (registrations)
     async createApplication(record: ApplicationRecord) {
+      invalidateApplicationsCache();
       const db = await getAdminDb();
       await db.collection(WRITE.applications).doc(record.id).set(record);
       return record;
@@ -587,62 +596,53 @@ export function createFirebaseStore(): DataStore {
       return null;
     },
     async listApplications() {
+      const now = Date.now();
+      if (_appsCache && now - _appsCache.timestamp < CACHE_TTL_MS) {
+        return _appsCache.data;
+      }
+
       const db = await getAdminDb();
       const recordsMap = new Map<string, ApplicationRecord>();
       const orderIdIndex = new Map<string, string>();
       const dedupeIndex = new Map<string, string>();
 
-      const candidateCollections = new Set<string>([
-        WRITE.applications,
-        READ.applications,
+      // Target collections that genuinely store registrations and applications
+      const targetCollections = [
+        WRITE.applications,      // "ktt_applications"
+        READ.applications,       // "registrations"
         "applications",
         "hackathon_registrations",
-        "hackathons",
-        "hackathon",
         "hack2skill",
         "payments",
-        "payment",
-        "orders",
-        "order",
-        "event_registrations",
-        "events",
-        "ktt_payments",
-        "ktt_registrations",
-      ]);
+      ];
 
-      // Dynamically discover all top-level collections in Firestore
       try {
-        const topCollections = await db.listCollections();
-        for (const col of topCollections) {
-          const id = col.id;
-          const lower = id.toLowerCase();
-          if (
-            lower.includes("hack") ||
-            lower.includes("regist") ||
-            lower.includes("appl") ||
-            lower.includes("pay") ||
-            lower.includes("order") ||
-            lower.includes("event")
-          ) {
-            candidateCollections.add(id);
-          }
-        }
-      } catch (err) {
-        console.warn("[firebaseStore] listCollections not accessible or empty, using candidate list:", err);
-      }
+        // Query target collections, certificates, and interns concurrently
+        const [colResults, certSnap, internSnap] = await Promise.all([
+          Promise.allSettled(
+            targetCollections.map(async (colName) => {
+              try {
+                const snap = await db.collection(colName).limit(1000).get();
+                return snap.docs.map((d) => ({ id: d.id, data: d.data() as Doc }));
+              } catch {
+                return [];
+              }
+            })
+          ),
+          db.collection(READ.certificates).limit(1000).get().catch(() => null),
+          db.collection(READ.interns).limit(1000).get().catch(() => null),
+        ]);
 
-      for (const colName of candidateCollections) {
-        try {
-          const snap = await db.collection(colName).limit(1000).get();
-          for (const doc of snap.docs) {
-            const raw = doc.data() as Doc;
+        // Process registrations & applications
+        for (const colRes of colResults) {
+          if (colRes.status !== "fulfilled") continue;
+          for (const item of colRes.value) {
+            const raw = item.data;
             if (!raw || Object.keys(raw).length === 0) continue;
 
-            const rec = mapLegacyApplication(doc.id, raw);
+            const rec = mapLegacyApplication(item.id, raw);
+            const primaryKey = rec.applicationId || item.id;
 
-            const primaryKey = rec.applicationId || doc.id;
-
-            // Match existing record by primaryKey, orderId, or dedupeKey
             let matchedKey = recordsMap.has(primaryKey) ? primaryKey : undefined;
             if (!matchedKey && rec.razorpayOrderId && orderIdIndex.has(rec.razorpayOrderId)) {
               matchedKey = orderIdIndex.get(rec.razorpayOrderId);
@@ -661,109 +661,104 @@ export function createFirebaseStore(): DataStore {
               if (rec.dedupeKey) dedupeIndex.set(rec.dedupeKey, primaryKey);
             }
           }
-        } catch {
-          // Skip missing collections gracefully
         }
-      }
 
-      // Extract all historical certificates & interns (Batch 1: May - Jun 2026)
-      try {
-        const certSnap = await db.collection(READ.certificates).limit(1000).get();
-        for (const cDoc of certSnap.docs) {
-          const c = cDoc.data() as Doc;
-          const certId = str(c.certificateId);
-          const email = str(c.email || c.internEmail || "").trim().toLowerCase();
-          const name = str(c.name || c.internName || c.recipientName || "Intern");
-          const domain = extractLegacyDomain(c, false);
-          const internId = str(c.internId || c.internRef || "");
-          const issuedAt = toIso(c.issuedAt || "2026-06-21T00:00:00.000Z");
+        // Process certificates enrichment (Batch 1: May - Jun 2026)
+        if (certSnap && certSnap.docs) {
+          for (const cDoc of certSnap.docs) {
+            const c = cDoc.data() as Doc;
+            const certId = str(c.certificateId);
+            const email = str(c.email || c.internEmail || "").trim().toLowerCase();
+            const name = str(c.name || c.internName || c.recipientName || "Intern");
+            const domain = extractLegacyDomain(c, false);
+            const internId = str(c.internId || c.internRef || "");
+            const issuedAt = toIso(c.issuedAt || "2026-06-21T00:00:00.000Z");
 
-          // Check if an application already exists for this email or internId
-          let matched = Array.from(recordsMap.values()).find(
-            (r) =>
-              (email && r.email.toLowerCase() === email) ||
-              (internId && (r.applicationId === internId || r.id === internId))
-          );
+            let matched = Array.from(recordsMap.values()).find(
+              (r) =>
+                (email && r.email.toLowerCase() === email) ||
+                (internId && (r.applicationId === internId || r.id === internId))
+            );
 
-          if (matched) {
-            recordsMap.set(matched.applicationId || matched.id, {
-              ...matched,
-              certificateId: certId || matched.certificateId,
-              status: "CERTIFICATE_ISSUED",
-              batch: matched.batch || "batch-1-may-jun-2026",
-              amount: matched.amount && matched.amount > 0 ? matched.amount : 222,
-            });
-          } else if (email || certId) {
-            // Create a historical application record from certificate
-            const appId = internId || `APP-2026-C${certId.replace(/[^A-Z0-9]/gi, "").slice(-6) || cDoc.id.slice(0, 6)}`;
-            const record: ApplicationRecord = {
-              id: cDoc.id,
-              applicationId: appId,
-              name,
-              email: email || `${appId.toLowerCase()}@kicktotech.in`,
-              phone: str(c.phone || ""),
-              college: str(c.college || ""),
-              domain,
-              amount: 222,
-              status: "CERTIFICATE_ISSUED",
-              certificateId: certId,
-              batch: "batch-1-may-jun-2026",
-              createdAt: issuedAt,
-              updatedAt: issuedAt,
-              dedupeKey: `${email || appId}:${domain}`,
-            };
-            recordsMap.set(appId, record);
+            if (matched) {
+              recordsMap.set(matched.applicationId || matched.id, {
+                ...matched,
+                certificateId: certId || matched.certificateId,
+                status: "CERTIFICATE_ISSUED",
+                batch: matched.batch || "batch-1-may-jun-2026",
+                amount: matched.amount && matched.amount > 0 ? matched.amount : 222,
+              });
+            } else if (email || certId) {
+              const appId = internId || `APP-2026-C${certId.replace(/[^A-Z0-9]/gi, "").slice(-6) || cDoc.id.slice(0, 6)}`;
+              const record: ApplicationRecord = {
+                id: cDoc.id,
+                applicationId: appId,
+                name,
+                email: email || `${appId.toLowerCase()}@kicktotech.in`,
+                phone: str(c.phone || ""),
+                college: str(c.college || ""),
+                domain,
+                amount: 222,
+                status: "CERTIFICATE_ISSUED",
+                certificateId: certId,
+                batch: "batch-1-may-jun-2026",
+                createdAt: issuedAt,
+                updatedAt: issuedAt,
+                dedupeKey: `${email || appId}:${domain}`,
+              };
+              recordsMap.set(appId, record);
+            }
+          }
+        }
+
+        // Process interns enrichment
+        if (internSnap && internSnap.docs) {
+          for (const iDoc of internSnap.docs) {
+            const iData = iDoc.data() as Doc;
+            const email = str(iData.email).trim().toLowerCase();
+            const internId = str(iData.internId || iDoc.id);
+            const joinedAt = toIso(iData.createdAt || iData.joinedAt || "2026-05-18T00:00:00.000Z");
+            const domain = extractLegacyDomain(iData, false);
+            const batch = detectBatch(joinedAt, 222, domain);
+
+            let matched = Array.from(recordsMap.values()).find(
+              (r) =>
+                (email && r.email.toLowerCase() === email) ||
+                r.applicationId === internId ||
+                r.id === iDoc.id
+            );
+
+            if (matched) {
+              recordsMap.set(matched.applicationId || matched.id, {
+                ...matched,
+                college: matched.college || str(iData.college),
+                phone: matched.phone || str(iData.phone),
+                prn: matched.prn || str(iData.prn),
+                course: matched.course || str(iData.course),
+                year: matched.year || str(iData.year),
+                domain: matched.domain && matched.domain !== "python" ? matched.domain : domain,
+                batch: matched.batch || batch,
+                status:
+                  matched.status === "PAYMENT_PENDING" && str(iData.paymentStatus).toUpperCase() === "PAID"
+                    ? "PAYMENT_VERIFIED"
+                    : matched.status,
+              });
+            }
           }
         }
       } catch (err) {
-        console.warn("[firebaseStore] Failed cross-referencing certificates:", err);
+        console.warn("[firebaseStore] Parallel listApplications error:", err);
       }
 
-      // Also enrich from interns collection
-      try {
-        const internSnap = await db.collection(READ.interns).limit(1000).get();
-        for (const iDoc of internSnap.docs) {
-          const iData = iDoc.data() as Doc;
-          const email = str(iData.email).trim().toLowerCase();
-          const internId = str(iData.internId || iDoc.id);
-          const joinedAt = toIso(iData.createdAt || iData.joinedAt || "2026-05-18T00:00:00.000Z");
-          const domain = extractLegacyDomain(iData, false);
-          const batch = detectBatch(joinedAt, 222, domain);
-
-          let matched = Array.from(recordsMap.values()).find(
-            (r) =>
-              (email && r.email.toLowerCase() === email) ||
-              r.applicationId === internId ||
-              r.id === iDoc.id
-          );
-
-          if (matched) {
-            recordsMap.set(matched.applicationId || matched.id, {
-              ...matched,
-              college: matched.college || str(iData.college),
-              phone: matched.phone || str(iData.phone),
-              prn: matched.prn || str(iData.prn),
-              course: matched.course || str(iData.course),
-              year: matched.year || str(iData.year),
-              domain: matched.domain && matched.domain !== "python" ? matched.domain : domain,
-              batch: matched.batch || batch,
-              status:
-                matched.status === "PAYMENT_PENDING" && str(iData.paymentStatus).toUpperCase() === "PAID"
-                  ? "PAYMENT_VERIFIED"
-                  : matched.status,
-            });
-          }
-        }
-      } catch (err) {
-        console.warn("[firebaseStore] Failed cross-referencing interns:", err);
-      }
-
-      // Sort descending in memory (safe against missing timestamps / index errors)
       const list = Array.from(recordsMap.values());
       list.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+
+      // Update cache
+      _appsCache = { data: list, timestamp: Date.now() };
       return list;
     },
     async updateApplication(id: string, patch: Partial<ApplicationRecord>) {
+      invalidateApplicationsCache();
       const db = await getAdminDb();
       const ref = db.collection(WRITE.applications).doc(id);
       await ref.set(patch, { merge: true });
