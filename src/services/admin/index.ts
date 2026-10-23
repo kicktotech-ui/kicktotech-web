@@ -77,11 +77,13 @@ export interface AdminApplication {
   razorpayPaymentId?: string;
   paymentMethod?: string;
   kttId?: string;
+  batch?: string;
 }
 
 export interface ApplicationQueryParams extends QueryParams {
   type?: "internship" | "hackathon" | "all";
   confirmed?: boolean;
+  batch?: string;
 }
 
 export interface AdminCreateApplicationPayload {
@@ -93,6 +95,7 @@ export interface AdminCreateApplicationPayload {
   year?: string;
   prn?: string;
   domain: string;
+  batch?: string;
   amount?: number;
   status?: AdminApplicationStatus;
   mentorId?: string;
@@ -118,6 +121,7 @@ export const adminApplicationService = {
     q.set("page", String(params.page ?? 1));
     q.set("pageSize", String(params.pageSize ?? 10));
     if (params.type && params.type !== "all") q.set("type", params.type);
+    if (params.batch && params.batch !== "all") q.set("batch", params.batch);
     if (params.confirmed) q.set("confirmed", "true");
     const status = params.filters?.status;
     if (status) q.set("status", status);

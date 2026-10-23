@@ -25,7 +25,6 @@ import { formatDate } from "@/lib/utils";
 import {
   Plus,
   Download,
-  BadgeCheck,
   XCircle,
   Award,
   ExternalLink,
@@ -35,11 +34,15 @@ import {
   Check,
   CheckCircle2,
   Clock,
-  BookOpen,
   Users,
   CreditCard,
   Sparkles,
+  Calendar,
+  Layers,
+  GraduationCap,
 } from "lucide-react";
+
+export type BatchKey = "batch-2-oct-nov-2026" | "batch-1-may-jun-2026" | "all";
 
 const STATUS_TONE: Record<AdminApplicationStatus, "neutral" | "yellow" | "green" | "red" | "blue"> = {
   PAYMENT_PENDING: "neutral",
@@ -57,26 +60,51 @@ const STATUS_LABEL: Record<AdminApplicationStatus, string> = {
   CERTIFICATE_ISSUED: "Certificate issued",
 };
 
-const DOMAIN_OPTIONS = [
-  { value: "python", label: "Python (AI + Projects)", defaultPrice: 449 },
-  { value: "java", label: "Java Development", defaultPrice: 449 },
+const BATCH_TABS: { key: BatchKey; label: string; badge: string; desc: string }[] = [
+  {
+    key: "batch-2-oct-nov-2026",
+    label: "Batch 2 (Oct - Nov 2026)",
+    badge: "Active Cohort • ₹449",
+    desc: "2 Domains: Python Development + Project, Java Development + Project",
+  },
+  {
+    key: "batch-1-may-jun-2026",
+    label: "Batch 1 (May - Jun 2026)",
+    badge: "1st Cohort • ₹222",
+    desc: "4 Domains: Python, Java, Data Analytics, Cybersecurity • Certificates Issued",
+  },
+  {
+    key: "all",
+    label: "All Cohorts",
+    badge: "Combined View",
+    desc: "All historical and active internship registrations",
+  },
+];
+
+const BATCH_2_DOMAINS = [
+  { value: "python", label: "Python Development + Project", defaultPrice: 449 },
+  { value: "java", label: "Java Development + Project", defaultPrice: 449 },
+];
+
+const BATCH_1_DOMAINS = [
+  { value: "python", label: "Python Development", defaultPrice: 222 },
+  { value: "java", label: "Java Development", defaultPrice: 222 },
   { value: "data-analytics", label: "Data Analytics", defaultPrice: 222 },
   { value: "cybersecurity", label: "Cybersecurity", defaultPrice: 222 },
-  { value: "web-development", label: "Web Development", defaultPrice: 449 },
 ];
 
 function getDomainBadge(domain: string | undefined) {
   const norm = String(domain || "").toLowerCase().trim();
   if (norm.includes("python")) {
     return {
-      label: "Python (AI + Projects)",
+      label: "Python Development + Project",
       badgeClass: "bg-blue-500/10 text-blue-400 border border-blue-500/20",
       accent: "#0057ff",
     };
   }
   if (norm.includes("java")) {
     return {
-      label: "Java Development",
+      label: "Java Development + Project",
       badgeClass: "bg-amber-500/10 text-amber-400 border border-amber-500/20",
       accent: "#ea580c",
     };
@@ -116,8 +144,24 @@ function getDomainBadge(domain: string | undefined) {
   };
 }
 
+function getBatchBadge(batch: string | undefined) {
+  if (batch === "batch-1-may-jun-2026") {
+    return {
+      label: "Batch 1 (May-Jun)",
+      className: "bg-purple-500/10 text-purple-400 border border-purple-500/20",
+      expectedFee: 222,
+    };
+  }
+  return {
+    label: "Batch 2 (Oct-Nov)",
+    className: "bg-blue-500/10 text-blue-400 border border-blue-500/20",
+    expectedFee: 449,
+  };
+}
+
 export default function ApplicationsPage() {
   const toast = useToast();
+  const [selectedBatch, setSelectedBatch] = useState<BatchKey>("batch-2-oct-nov-2026");
   const [refreshKey, setRefreshKey] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
   const [stats, setStats] = useState({ total: 0, verified: 0, pending: 0, revenue: 0 });
@@ -138,6 +182,7 @@ export default function ApplicationsPage() {
     course: "",
     year: "",
     prn: "",
+    batch: "batch-2-oct-nov-2026",
     domain: "python",
     amount: 449,
     status: "PAYMENT_VERIFIED" as AdminApplicationStatus,
@@ -156,6 +201,7 @@ export default function ApplicationsPage() {
     course: "",
     year: "",
     prn: "",
+    batch: "batch-2-oct-nov-2026",
     domain: "python",
     amount: 449,
     status: "PAYMENT_PENDING" as AdminApplicationStatus,
@@ -165,31 +211,75 @@ export default function ApplicationsPage() {
 
   const refresh = () => setRefreshKey((k) => k + 1);
 
-  // Fetch summary metrics on mount or refresh
+  // Trigger table and metric refresh when switching cohort tabs
   useEffect(() => {
-    adminApplicationService.query({ type: "internship", pageSize: 5000 }).then((res) => {
-      const total = res.total;
-      const verified = res.rows.filter(
-        (r) => r.status === "PAYMENT_VERIFIED" || r.status === "CERTIFICATE_ISSUED",
-      ).length;
-      const pending = res.rows.filter(
-        (r) => r.status === "PAYMENT_PENDING" || r.status === "PAYMENT_PROOF_SUBMITTED",
-      ).length;
-      const revenue = res.rows
-        .filter((r) => r.status === "PAYMENT_VERIFIED" || r.status === "CERTIFICATE_ISSUED")
-        .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-      setStats({ total, verified, pending, revenue });
-    }).catch(() => {});
-  }, [refreshKey]);
+    setRefreshKey((k) => k + 1);
+  }, [selectedBatch]);
+
+  // Fetch summary metrics on mount, refresh, or batch tab change
+  useEffect(() => {
+    adminApplicationService
+      .query({ type: "internship", batch: selectedBatch, pageSize: 5000 })
+      .then((res) => {
+        const total = res.total;
+        const verified = res.rows.filter(
+          (r) => r.status === "PAYMENT_VERIFIED" || r.status === "CERTIFICATE_ISSUED",
+        ).length;
+        const pending = res.rows.filter(
+          (r) => r.status === "PAYMENT_PENDING" || r.status === "PAYMENT_PROOF_SUBMITTED",
+        ).length;
+        const revenue = res.rows
+          .filter((r) => r.status === "PAYMENT_VERIFIED" || r.status === "CERTIFICATE_ISSUED")
+          .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+        setStats({ total, verified, pending, revenue });
+      })
+      .catch(() => {});
+  }, [refreshKey, selectedBatch]);
+
+  // Handle Batch switch inside Add Form
+  const handleAddBatchChange = (batch: string) => {
+    const isBatch1 = batch === "batch-1-may-jun-2026";
+    const defaultAmount = isBatch1 ? 222 : 449;
+    setAddForm((prev) => ({
+      ...prev,
+      batch,
+      domain: "python",
+      amount: defaultAmount,
+    }));
+  };
 
   // Handle Domain Change in Add Form to update default amount
   const handleAddDomainChange = (domain: string) => {
-    const opt = DOMAIN_OPTIONS.find((d) => d.value === domain);
+    const options = addForm.batch === "batch-1-may-jun-2026" ? BATCH_1_DOMAINS : BATCH_2_DOMAINS;
+    const opt = options.find((d) => d.value === domain);
     setAddForm((prev) => ({
       ...prev,
       domain,
       amount: opt ? opt.defaultPrice : prev.amount,
     }));
+  };
+
+  // Open Add Modal prefilled with active batch
+  const openAddModal = () => {
+    const initialBatch = selectedBatch === "batch-1-may-jun-2026" ? "batch-1-may-jun-2026" : "batch-2-oct-nov-2026";
+    setAddForm({
+      name: "",
+      email: "",
+      phone: "",
+      college: "",
+      course: "",
+      year: "",
+      prn: "",
+      batch: initialBatch,
+      domain: "python",
+      amount: initialBatch === "batch-1-may-jun-2026" ? 222 : 449,
+      status: "PAYMENT_VERIFIED",
+      mentorId: "",
+      mentorName: "",
+      reviewNote: "",
+      grantAccess: true,
+    });
+    setAddModalOpen(true);
   };
 
   // Submit Add Form
@@ -204,23 +294,6 @@ export default function ApplicationsPage() {
       const res = await adminApplicationService.create(addForm);
       toast.success(`Internship record created for ${addForm.name}!`);
       setAddModalOpen(false);
-      // Reset add form
-      setAddForm({
-        name: "",
-        email: "",
-        phone: "",
-        college: "",
-        course: "",
-        year: "",
-        prn: "",
-        domain: "python",
-        amount: 449,
-        status: "PAYMENT_VERIFIED",
-        mentorId: "",
-        mentorName: "",
-        reviewNote: "",
-        grantAccess: true,
-      });
       refresh();
       if (res.access) {
         setAccessResult(res);
@@ -236,6 +309,7 @@ export default function ApplicationsPage() {
   // Open Edit Modal
   const openEditModal = (app: AdminApplication) => {
     setEditApp(app);
+    const initialBatch = app.batch || (app.amount === 222 ? "batch-1-may-jun-2026" : "batch-2-oct-nov-2026");
     setEditForm({
       name: app.name,
       email: app.email,
@@ -244,8 +318,9 @@ export default function ApplicationsPage() {
       course: app.course || "",
       year: app.year || "",
       prn: app.prn || "",
+      batch: initialBatch,
       domain: app.domain || "python",
-      amount: app.amount || 449,
+      amount: app.amount || (initialBatch === "batch-1-may-jun-2026" ? 222 : 449),
       status: app.status,
       mentorName: app.mentorName || "",
       reviewNote: app.reviewNote || "",
@@ -333,17 +408,22 @@ export default function ApplicationsPage() {
     }
   }
 
-  // Export CSV
+  // Export CSV for the currently active batch
   const handleExportCsv = async () => {
     try {
       toast.info("Preparing CSV export...");
-      const res = await adminApplicationService.query({ type: "internship", pageSize: 5000 });
+      const res = await adminApplicationService.query({
+        type: "internship",
+        batch: selectedBatch,
+        pageSize: 5000,
+      });
       if (!res.rows.length) {
-        toast.error("No applications to export.");
+        toast.error("No applications to export for this cohort.");
         return;
       }
       const headers = [
         "Application ID",
+        "Cohort Batch",
         "Name",
         "Email",
         "Phone",
@@ -352,14 +432,16 @@ export default function ApplicationsPage() {
         "Year",
         "PRN",
         "Domain",
-        "Amount (INR)",
+        "Fee Amount (INR)",
         "Payment Status",
+        "Certificate ID",
         "Mentor",
         "Review Note",
         "Submitted Date",
       ];
       const rows = res.rows.map((r) => [
         `"${r.applicationId}"`,
+        `"${r.batch === "batch-1-may-jun-2026" ? "Batch 1 (May-Jun 2026)" : "Batch 2 (Oct-Nov 2026)"}"`,
         `"${r.name.replace(/"/g, '""')}"`,
         `"${r.email}"`,
         `"${r.phone}"`,
@@ -368,8 +450,9 @@ export default function ApplicationsPage() {
         `"${(r.year || "").replace(/"/g, '""')}"`,
         `"${(r.prn || "").replace(/"/g, '""')}"`,
         `"${getDomainBadge(r.domain).label}"`,
-        r.amount ?? 449,
+        r.amount ?? (r.batch === "batch-1-may-jun-2026" ? 222 : 449),
         `"${STATUS_LABEL[r.status] || r.status}"`,
+        `"${r.certificateId || ""}"`,
         `"${(r.mentorName || "").replace(/"/g, '""')}"`,
         `"${(r.reviewNote || "").replace(/"/g, '""')}"`,
         `"${r.createdAt}"`,
@@ -379,12 +462,18 @@ export default function ApplicationsPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `internship_applications_${new Date().toISOString().slice(0, 10)}.csv`);
+      const batchSuffix =
+        selectedBatch === "batch-1-may-jun-2026"
+          ? "batch1_may_jun_222rs"
+          : selectedBatch === "batch-2-oct-nov-2026"
+          ? "batch2_oct_nov_449rs"
+          : "all_batches";
+      link.setAttribute("download", `ktt_internships_${batchSuffix}_${new Date().toISOString().slice(0, 10)}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       toast.success("CSV download started!");
-    } catch (err) {
+    } catch {
       toast.error("Failed to generate CSV export.");
     }
   };
@@ -433,16 +522,24 @@ export default function ApplicationsPage() {
     },
     {
       key: "domain",
-      header: "Domain / Mentor",
+      header: "Domain / Cohort",
       render: (r) => {
-        const badge = getDomainBadge(r.domain);
+        const dBadge = getDomainBadge(r.domain);
+        const bBadge = getBatchBadge(r.batch);
         return (
           <div className="space-y-1">
-            <span
-              className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-semibold ${badge.badgeClass}`}
-            >
-              {badge.label}
-            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span
+                className={`inline-block rounded-md px-2 py-0.5 text-[11px] font-semibold ${dBadge.badgeClass}`}
+              >
+                {dBadge.label}
+              </span>
+              <span
+                className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-medium ${bBadge.className}`}
+              >
+                {bBadge.label}
+              </span>
+            </div>
             <p className="text-xs text-adm-muted">Mentor: {r.mentorName ?? "—"}</p>
           </div>
         );
@@ -452,11 +549,21 @@ export default function ApplicationsPage() {
       key: "amount",
       header: "Fee",
       sortable: true,
-      render: (r) => (
-        <div className="text-xs">
-          <span className="font-semibold text-adm-fg">₹{r.amount ?? 449}</span>
-        </div>
-      ),
+      render: (r) => {
+        const expected = r.batch === "batch-1-may-jun-2026" ? 222 : 449;
+        const amount = r.amount ?? expected;
+        return (
+          <div className="text-xs">
+            <span className="font-semibold text-adm-fg">₹{amount}</span>
+            {amount === 222 && (
+              <span className="ml-1 text-[10px] text-purple-400 font-mono">(Batch 1)</span>
+            )}
+            {amount === 449 && (
+              <span className="ml-1 text-[10px] text-blue-400 font-mono">(Batch 2)</span>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "status",
@@ -508,12 +615,13 @@ export default function ApplicationsPage() {
 
         return (
           <div className="flex items-center gap-1.5">
-            {r.status === "CERTIFICATE_ISSUED" ? (
+            {r.status === "CERTIFICATE_ISSUED" || r.certificateId ? (
               <a
                 href={`/verify_cert?cert=${encodeURIComponent(r.certificateId ?? "")}`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold text-[#0057ff] hover:bg-[#0057ff]/10"
+                className="inline-flex items-center gap-1 rounded bg-[#0057ff]/10 px-2 py-1 text-xs font-semibold text-[#0057ff] hover:bg-[#0057ff]/20 border border-[#0057ff]/20 transition-colors"
+                title={`View Certificate: ${r.certificateId}`}
               >
                 <ExternalLink className="h-3.5 w-3.5" /> Cert
               </a>
@@ -532,7 +640,7 @@ export default function ApplicationsPage() {
                 size="sm"
                 variant="success"
                 disabled={disabled}
-                onClick={() => decide(r, "verify")}
+                onClick={() => handleGrantAccess(r)}
                 title="Verify payment and unlock student portal access"
               >
                 <KeyRound className="h-3.5 w-3.5" /> Give Access
@@ -545,7 +653,7 @@ export default function ApplicationsPage() {
               variant="secondary"
               disabled={disabled}
               onClick={() => openEditModal(r)}
-              title="Edit domain, amount, payment status, or student info"
+              title="Edit batch, domain, fee, payment status, or student info"
             >
               <Pencil className="h-3.5 w-3.5" />
             </Button>
@@ -569,22 +677,67 @@ export default function ApplicationsPage() {
     },
   ];
 
+  const activeBatchTabInfo = BATCH_TABS.find((t) => t.key === selectedBatch);
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Internship Applications"
-        subtitle="Manage, edit, verify applications, and grant students access to the Kick To Tech internship portal."
+        title="Internship Applications & Batches"
+        subtitle="Manage Batch 1 (May-Jun 2026, ₹222, 4 domains) and Batch 2 (Oct-Nov 2026, ₹449, 2 domains) with zero data loss."
         actions={
           <>
             <Button variant="secondary" onClick={handleExportCsv}>
-              <Download className="h-4 w-4" /> Export CSV
+              <Download className="h-4 w-4" /> Export CSV ({activeBatchTabInfo?.label})
             </Button>
-            <Button variant="primary" onClick={() => setAddModalOpen(true)}>
+            <Button variant="primary" onClick={openAddModal}>
               <Plus className="h-4 w-4" /> Add Application
             </Button>
           </>
         }
       />
+
+      {/* Cohort / Batch Filter Switcher */}
+      <div className="rounded-2xl border border-adm-border bg-adm-surface p-2 shadow-sm">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-1.5 overflow-x-auto p-1">
+            {BATCH_TABS.map((tab) => {
+              const active = selectedBatch === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setSelectedBatch(tab.key)}
+                  className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all whitespace-nowrap ${
+                    active
+                      ? "bg-[#0057ff] text-white shadow-md shadow-[#0057ff]/25"
+                      : "text-adm-muted hover:text-adm-fg hover:bg-adm-surface2"
+                  }`}
+                >
+                  {tab.key === "batch-2-oct-nov-2026" ? (
+                    <Calendar className="h-4 w-4" />
+                  ) : tab.key === "batch-1-may-jun-2026" ? (
+                    <GraduationCap className="h-4 w-4" />
+                  ) : (
+                    <Layers className="h-4 w-4" />
+                  )}
+                  <span>{tab.label}</span>
+                  <span
+                    className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
+                      active ? "bg-white/20 text-white" : "bg-adm-surface2 text-adm-muted border border-adm-border"
+                    }`}
+                  >
+                    {tab.badge}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="px-3 py-1 text-right text-xs text-adm-muted hidden lg:block">
+            {activeBatchTabInfo?.desc}
+          </div>
+        </div>
+      </div>
 
       {/* Metrics Overview Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -596,7 +749,9 @@ export default function ApplicationsPage() {
             </div>
           </div>
           <p className="mt-2 text-2xl font-bold text-adm-fg">{stats.total}</p>
-          <span className="text-[11px] text-adm-muted">Internship registrations</span>
+          <span className="text-[11px] text-adm-muted">
+            {selectedBatch === "all" ? "All cohorts combined" : activeBatchTabInfo?.label}
+          </span>
         </div>
 
         <div className="rounded-xl border border-adm-border bg-adm-surface p-4 shadow-sm">
@@ -607,7 +762,7 @@ export default function ApplicationsPage() {
             </div>
           </div>
           <p className="mt-2 text-2xl font-bold text-emerald-400">{stats.verified}</p>
-          <span className="text-[11px] text-emerald-500/80">Access granted to student dashboard</span>
+          <span className="text-[11px] text-emerald-500/80">Portal access unlocked</span>
         </div>
 
         <div className="rounded-xl border border-adm-border bg-adm-surface p-4 shadow-sm">
@@ -618,7 +773,7 @@ export default function ApplicationsPage() {
             </div>
           </div>
           <p className="mt-2 text-2xl font-bold text-yellow-400">{stats.pending}</p>
-          <span className="text-[11px] text-adm-muted">Pending payment or review</span>
+          <span className="text-[11px] text-adm-muted">Pending payment proof review</span>
         </div>
 
         <div className="rounded-xl border border-adm-border bg-adm-surface p-4 shadow-sm">
@@ -629,14 +784,26 @@ export default function ApplicationsPage() {
             </div>
           </div>
           <p className="mt-2 text-2xl font-bold text-adm-fg">₹{stats.revenue.toLocaleString("en-IN")}</p>
-          <span className="text-[11px] text-adm-muted">Confirmed internship fees</span>
+          <span className="text-[11px] text-adm-muted">
+            {selectedBatch === "batch-1-may-jun-2026"
+              ? "May-Jun (₹222 / student)"
+              : selectedBatch === "batch-2-oct-nov-2026"
+              ? "Oct-Nov (₹449 / student)"
+              : "All internship revenue"}
+          </span>
         </div>
       </div>
 
       {/* Applications Data Table */}
       <DataTable
         columns={columns}
-        fetcher={(p) => adminApplicationService.query({ ...p, type: "internship" })}
+        fetcher={(p) =>
+          adminApplicationService.query({
+            ...p,
+            type: "internship",
+            batch: selectedBatch,
+          })
+        }
         searchPlaceholder="Search applicant, email, phone, PRN, college, domain..."
         refreshKey={refreshKey}
         filters={[
@@ -648,7 +815,6 @@ export default function ApplicationsPage() {
               { value: "java", label: "Java Development" },
               { value: "data-analytics", label: "Data Analytics" },
               { value: "cybersecurity", label: "Cybersecurity" },
-              { value: "web-development", label: "Web Development" },
             ],
           },
           {
@@ -660,8 +826,8 @@ export default function ApplicationsPage() {
             })),
           },
         ]}
-        emptyTitle="No internship applications found"
-        emptyDescription="Create a new application or adjust your search filters."
+        emptyTitle={`No applications found in ${activeBatchTabInfo?.label}`}
+        emptyDescription="Create a new application or switch cohorts using the tabs above."
       />
 
       {/* Modal 1: Add New Application */}
@@ -680,12 +846,29 @@ export default function ApplicationsPage() {
               disabled={busy === "create"}
               onClick={handleCreateApplication}
             >
-              <Plus className="h-4 w-4" /> Create & Save Record
+              <Plus className="h-4 w-4" /> Create & Grant Access
             </Button>
           </>
         }
       >
         <form onSubmit={handleCreateApplication} className="space-y-4">
+          {/* Cohort Selector in Add Form */}
+          <div className="rounded-xl border border-[#0057ff]/30 bg-[#0057ff]/5 p-3">
+            <Field label="Internship Cohort / Batch *">
+              <Select
+                value={addForm.batch}
+                onChange={(e) => handleAddBatchChange(e.target.value)}
+              >
+                <option value="batch-2-oct-nov-2026">
+                  Batch 2: Oct - Nov 2026 (Active Cohort • ₹449 • Python & Java Projects)
+                </option>
+                <option value="batch-1-may-jun-2026">
+                  Batch 1: May - Jun 2026 (Past Cohort • ₹222 • 4 Domains)
+                </option>
+              </Select>
+            </Field>
+          </div>
+
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Applicant Full Name *">
               <Input
@@ -754,7 +937,7 @@ export default function ApplicationsPage() {
                 value={addForm.domain}
                 onChange={(e) => handleAddDomainChange(e.target.value)}
               >
-                {DOMAIN_OPTIONS.map((d) => (
+                {(addForm.batch === "batch-1-may-jun-2026" ? BATCH_1_DOMAINS : BATCH_2_DOMAINS).map((d) => (
                   <option key={d.value} value={d.value}>
                     {d.label} (Standard fee: ₹{d.defaultPrice})
                   </option>
@@ -842,6 +1025,31 @@ export default function ApplicationsPage() {
         }
       >
         <form onSubmit={handleUpdateApplication} className="space-y-4">
+          <div className="rounded-xl border border-adm-border bg-adm-surface2/60 p-3">
+            <Field label="Cohort / Batch">
+              <Select
+                value={editForm.batch}
+                onChange={(e) => {
+                  const newBatch = e.target.value;
+                  const newAmount = newBatch === "batch-1-may-jun-2026" ? 222 : 449;
+                  setEditForm({
+                    ...editForm,
+                    batch: newBatch,
+                    domain: "python",
+                    amount: newAmount,
+                  });
+                }}
+              >
+                <option value="batch-2-oct-nov-2026">
+                  Batch 2: Oct - Nov 2026 (Active • ₹449 • Python & Java)
+                </option>
+                <option value="batch-1-may-jun-2026">
+                  Batch 1: May - Jun 2026 (Past • ₹222 • 4 Domains)
+                </option>
+              </Select>
+            </Field>
+          </div>
+
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Applicant Name">
               <Input
@@ -900,7 +1108,8 @@ export default function ApplicationsPage() {
                 value={editForm.domain}
                 onChange={(e) => {
                   const val = e.target.value;
-                  const opt = DOMAIN_OPTIONS.find((d) => d.value === val);
+                  const options = editForm.batch === "batch-1-may-jun-2026" ? BATCH_1_DOMAINS : BATCH_2_DOMAINS;
+                  const opt = options.find((d) => d.value === val);
                   setEditForm({
                     ...editForm,
                     domain: val,
@@ -908,13 +1117,12 @@ export default function ApplicationsPage() {
                   });
                 }}
               >
-                {DOMAIN_OPTIONS.map((d) => (
+                {(editForm.batch === "batch-1-may-jun-2026" ? BATCH_1_DOMAINS : BATCH_2_DOMAINS).map((d) => (
                   <option key={d.value} value={d.value}>
-                    {d.label}
+                    {d.label} (₹{d.defaultPrice})
                   </option>
                 ))}
-                {/* Fallback for any other custom domain string */}
-                {!DOMAIN_OPTIONS.some((d) => d.value === editForm.domain) && (
+                {!BATCH_1_DOMAINS.concat(BATCH_2_DOMAINS).some((d) => d.value === editForm.domain) && (
                   <option value={editForm.domain}>{editForm.domain}</option>
                 )}
               </Select>
@@ -990,6 +1198,12 @@ export default function ApplicationsPage() {
 
           <div className="rounded-xl border border-adm-border bg-adm-surface2/60 p-4 space-y-2.5 text-xs">
             <div className="flex justify-between border-b border-adm-border/50 pb-2">
+              <span className="text-adm-muted">Cohort Batch:</span>
+              <span className="font-semibold text-adm-fg">
+                {getBatchBadge(accessResult?.application.batch).label}
+              </span>
+            </div>
+            <div className="flex justify-between border-b border-adm-border/50 pb-2">
               <span className="text-adm-muted">Domain Track:</span>
               <span className="font-semibold text-adm-fg">
                 {getDomainBadge(accessResult?.application.domain).label}
@@ -998,7 +1212,7 @@ export default function ApplicationsPage() {
             <div className="flex justify-between border-b border-adm-border/50 pb-2">
               <span className="text-adm-muted">Fee Amount:</span>
               <span className="font-semibold text-adm-fg">
-                ₹{accessResult?.application.amount ?? 449} (Verified)
+                ₹{accessResult?.application.amount ?? (accessResult?.application.batch === "batch-1-may-jun-2026" ? 222 : 449)} (Verified)
               </span>
             </div>
             {accessResult?.access?.internId && (
@@ -1022,7 +1236,7 @@ export default function ApplicationsPage() {
             className="w-full gap-2 text-xs"
             onClick={() =>
               copyToClipboard(
-                `Hi ${accessResult?.application.name}, your Kick To Tech internship enrollment for ${getDomainBadge(accessResult?.application.domain).label} has been verified! Access your student dashboard here: https://kicktotech.in/internship/dashboard`,
+                `Hi ${accessResult?.application.name}, your Kick To Tech internship enrollment for ${getDomainBadge(accessResult?.application.domain).label} (${getBatchBadge(accessResult?.application.batch).label}) has been verified! Access your student dashboard here: https://kicktotech.in/internship/dashboard`,
               )
             }
           >

@@ -139,6 +139,26 @@ export interface ApplicationRecord {
   paymentMethod?: string;
   /** Unique sequential identifier for confirmed hackathon participants (e.g. KTT01, KTT02) */
   kttId?: string;
+  /** Internship batch identifier */
+  batch?: "batch-1-may-jun-2026" | "batch-2-oct-nov-2026" | string;
+}
+
+/**
+ * Identifies internship batch:
+ * - "batch-1-may-jun-2026": 1st batch (May - Jun 2026), 4 domains, ₹222 fee
+ * - "batch-2-oct-nov-2026": 2nd batch (Oct - Nov 2026), 2 domains (Python & Java), ₹449 fee
+ */
+export function detectBatch(createdAt?: string, amount?: number, domain?: string): "batch-1-may-jun-2026" | "batch-2-oct-nov-2026" {
+  if (amount === 222) return "batch-1-may-jun-2026";
+  if (amount === 449 && createdAt && createdAt >= "2026-10-01") return "batch-2-oct-nov-2026";
+  const d = String(domain || "").toLowerCase();
+  if (d.includes("data") || d.includes("analytic") || d.includes("cyber") || d.includes("security")) {
+    return "batch-1-may-jun-2026";
+  }
+  if (createdAt && createdAt >= "2026-10-01") {
+    return "batch-2-oct-nov-2026";
+  }
+  return "batch-1-may-jun-2026";
 }
 
 /**
@@ -181,13 +201,14 @@ export function parseRecordAmount(d: Record<string, unknown> | null | undefined,
 }
 
 /**
- * Standard default pricing per domain:
+ * Standard default pricing per domain & batch:
  * - PromptWars Hackathon: ₹99
- * - Data Analytics / Cybersecurity: ₹222
- * - Python / Java / Other Internships: ₹449
+ * - 1st Batch (May - Jun 2026) across all 4 domains: ₹222
+ * - 2nd Batch (Oct - Nov 2026) for Python & Java: ₹449
  */
-export function defaultAmountForDomain(domain?: string, isHack?: boolean): number {
+export function defaultAmountForDomain(domain?: string, isHack?: boolean, batch?: string): number {
   if (isHack) return 99;
+  if (batch === "batch-1-may-jun-2026") return 222;
   const d = String(domain || "").toLowerCase();
   if (d.includes("hack") || d.includes("prompt") || d.includes("war")) return 99;
   if (d.includes("data") || d.includes("analytic") || d.includes("cyber") || d.includes("security")) return 222;

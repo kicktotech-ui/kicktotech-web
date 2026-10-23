@@ -1,4 +1,4 @@
-import { getStore, isHackathonRecord, defaultAmountForDomain, type ApplicationRecord } from "./data";
+import { getStore, isHackathonRecord, defaultAmountForDomain, detectBatch, type ApplicationRecord } from "./data";
 import { applicationId as makeAppId } from "./crypto";
 import { writeAudit } from "./audit";
 import { AppError } from "./http";
@@ -311,6 +311,7 @@ export async function createAdminApplication(
   const amount = typeof input.amount === "number" ? input.amount : defaultAmountForDomain(domain, false);
   const now = new Date().toISOString();
   const status = input.status || "PAYMENT_VERIFIED";
+  const batch = input.batch || detectBatch(now, amount, domain);
 
   const record: ApplicationRecord = {
     id: store.newId(),
@@ -327,6 +328,7 @@ export async function createAdminApplication(
     mentorName: mentor?.name,
     amount,
     status,
+    batch,
     createdAt: now,
     updatedAt: now,
     dedupeKey: `${input.email.trim().toLowerCase()}:${domain}`,

@@ -21,6 +21,7 @@ export const GET = route(async (req, { requestId }) => {
   const search = (url.searchParams.get("search") ?? "").trim().toLowerCase();
   const status = url.searchParams.get("status") ?? undefined;
   const type = url.searchParams.get("type") ?? undefined;
+  const batch = url.searchParams.get("batch") ?? undefined;
   const domain = (url.searchParams.get("domain") ?? "").trim().toLowerCase();
   const confirmed = url.searchParams.get("confirmed") === "true";
   const page = Math.max(1, Number(url.searchParams.get("page") ?? 1));
@@ -68,6 +69,9 @@ export const GET = route(async (req, { requestId }) => {
       if (domain === "cybersecurity" || domain === "cyber") return d.includes("cyber") || d.includes("security");
       return d.includes(domain);
     });
+  }
+  if (batch && batch !== "all") {
+    rows = rows.filter((r) => r.batch === batch);
   }
   if (search) {
     rows = rows.filter((r) =>

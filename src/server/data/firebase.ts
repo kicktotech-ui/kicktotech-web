@@ -3,7 +3,7 @@ import { getAdminDb } from "../firebase/admin";
 import {
   type DataStore, type UserRecord, type SessionRecord, type CertificateRecord, type AuditRecord,
   type CertificateStatus, type PageResult, type ApplicationRecord,
-  isHackathonRecord, parseRecordAmount, defaultAmountForDomain,
+  isHackathonRecord, parseRecordAmount, defaultAmountForDomain, detectBatch,
 } from "./index";
 import { uuid } from "../crypto";
 
@@ -230,11 +230,13 @@ function mapLegacyApplication(id: string, d: Doc): ApplicationRecord {
   // Domain / Event:
   const domain = extractLegacyDomain(d, isHack);
 
-  const defaultAmount = defaultAmountForDomain(domain, isHack);
-  const amount = parseRecordAmount(d, defaultAmount);
-
   const createdAt = toIso(d.createdAt || d.appliedAt || d.registeredAt || d.date || d.timestamp || d.paidAt || new Date().toISOString());
   const updatedAt = toIso(d.updatedAt || d.createdAt || createdAt);
+
+  // Batch detection:
+  const batch = str(d.batch) || detectBatch(createdAt, parseRecordAmount(d, 0), domain);
+  const defaultAmount = defaultAmountForDomain(domain, isHack, batch);
+  const amount = parseRecordAmount(d, defaultAmount);
 
   const email = str(d.email || d.userEmail || d.studentEmail || "").trim();
   const name = str(d.name || d.fullName || d.userName || d.participantName || d.studentName || d.applicantName || "Participant");
@@ -272,11 +274,12 @@ function mapLegacyApplication(id: string, d: Doc): ApplicationRecord {
     status,
     createdAt,
     updatedAt,
+    batch,
     dedupeKey: str(d.dedupeKey) || `${email.toLowerCase()}:${domain}`,
     reviewNote: d.reviewNote ? str(d.reviewNote) : undefined,
     verifiedBy: d.verifiedBy ? str(d.verifiedBy) : undefined,
     verifiedAt: d.verifiedAt ? toIso(d.verifiedAt) : undefined,
-    certificateId: d.certificateId ? str(d.certificateId) : undefined,
+    certificateId: d.certificateId ? str(d.certificateId) : (d.certificate ? str(d.certificate) : undefined),
     razorpayOrderId,
     razorpayPaymentId,
     razorpaySignature,
@@ -661,6 +664,98 @@ export function createFirebaseStore(): DataStore {
         } catch {
           // Skip missing collections gracefully
         }
+      }
+
+      // Extract all historical certificates & interns (Batch 1: May - Jun 2026)
+      try {
+        const certSnap = await db.collection(READ.certificates).limit(1000).get();
+        for (const cDoc of certSnap.docs) {
+          const c = cDoc.data() as Doc;
+          const certId = str(c.certificateId);
+          const email = str(c.email || c.internEmail || "").trim().toLowerCase();
+          const name = str(c.name || c.internName || c.recipientName || "Intern");
+          const domain = extractLegacyDomain(c, false);
+          const internId = str(c.internId || c.internRef || "");
+          const issuedAt = toIso(c.issuedAt || "2026-06-21T00:00:00.000Z");
+
+          // Check if an application already exists for this email or internId
+          let matched = Array.from(recordsMap.values()).find(
+            (r) =>
+              (email && r.email.toLowerCase() === email) ||
+              (internId && (r.applicationId === internId || r.id === internId))
+          );
+
+          if (matched) {
+            recordsMap.set(matched.applicationId || matched.id, {
+              ...matched,
+              certificateId: certId || matched.certificateId,
+              status: "CERTIFICATE_ISSUED",
+              batch: matched.batch || "batch-1-may-jun-2026",
+              amount: matched.amount && matched.amount > 0 ? matched.amount : 222,
+            });
+          } else if (email || certId) {
+            // Create a historical application record from certificate
+            const appId = internId || `APP-2026-C${certId.replace(/[^A-Z0-9]/gi, "").slice(-6) || cDoc.id.slice(0, 6)}`;
+            const record: ApplicationRecord = {
+              id: cDoc.id,
+              applicationId: appId,
+              name,
+              email: email || `${appId.toLowerCase()}@kicktotech.in`,
+              phone: str(c.phone || ""),
+              college: str(c.college || ""),
+              domain,
+              amount: 222,
+              status: "CERTIFICATE_ISSUED",
+              certificateId: certId,
+              batch: "batch-1-may-jun-2026",
+              createdAt: issuedAt,
+              updatedAt: issuedAt,
+              dedupeKey: `${email || appId}:${domain}`,
+            };
+            recordsMap.set(appId, record);
+          }
+        }
+      } catch (err) {
+        console.warn("[firebaseStore] Failed cross-referencing certificates:", err);
+      }
+
+      // Also enrich from interns collection
+      try {
+        const internSnap = await db.collection(READ.interns).limit(1000).get();
+        for (const iDoc of internSnap.docs) {
+          const iData = iDoc.data() as Doc;
+          const email = str(iData.email).trim().toLowerCase();
+          const internId = str(iData.internId || iDoc.id);
+          const joinedAt = toIso(iData.createdAt || iData.joinedAt || "2026-05-18T00:00:00.000Z");
+          const domain = extractLegacyDomain(iData, false);
+          const batch = detectBatch(joinedAt, 222, domain);
+
+          let matched = Array.from(recordsMap.values()).find(
+            (r) =>
+              (email && r.email.toLowerCase() === email) ||
+              r.applicationId === internId ||
+              r.id === iDoc.id
+          );
+
+          if (matched) {
+            recordsMap.set(matched.applicationId || matched.id, {
+              ...matched,
+              college: matched.college || str(iData.college),
+              phone: matched.phone || str(iData.phone),
+              prn: matched.prn || str(iData.prn),
+              course: matched.course || str(iData.course),
+              year: matched.year || str(iData.year),
+              domain: matched.domain && matched.domain !== "python" ? matched.domain : domain,
+              batch: matched.batch || batch,
+              status:
+                matched.status === "PAYMENT_PENDING" && str(iData.paymentStatus).toUpperCase() === "PAID"
+                  ? "PAYMENT_VERIFIED"
+                  : matched.status,
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("[firebaseStore] Failed cross-referencing interns:", err);
       }
 
       // Sort descending in memory (safe against missing timestamps / index errors)
