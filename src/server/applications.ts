@@ -1,13 +1,14 @@
-import { getStore, isHackathonRecord, type ApplicationRecord } from "./data";
+import { getStore, isHackathonRecord, defaultAmountForDomain, type ApplicationRecord } from "./data";
 import { applicationId as makeAppId } from "./crypto";
 import { writeAudit } from "./audit";
 import { AppError } from "./http";
 import { getPaymentConfig, publicPaymentInfo, buildWhatsappUrl, type PublicPaymentInfo } from "./payments/config";
 import { resolveMentorForDomain, normalizeCertificateDomain, DOMAIN_META } from "@/lib/certificates/mentors";
-import type { ApplicationInput } from "./validation";
+import type { ApplicationInput, AdminCreateApplicationInput } from "./validation";
 import { sendBrevoTemplateEmail } from "./email/brevo";
 import { sendHackathonConfirmationEmail } from "./hackathonApplications";
 import { syncConfirmedHackathonParticipant } from "./integrations/googleSheets";
+import { getAdminDb, isAdminConfigured } from "./firebase/admin";
 
 /*
  * Internship application service — the manual UPI + WhatsApp payment gate.
@@ -143,6 +144,211 @@ export async function rejectPayment(applicationId: string, reason: string | unde
   });
   await writeAudit({ actor: meta.actor, action: "PAYMENT_REJECTED", target: applicationId, requestId: meta.requestId });
   return updated ?? app;
+}
+
+export interface AccessGrantResult {
+  application: ApplicationRecord;
+  access?: {
+    internId: string;
+    activationCode: string;
+    dashboardUrl: string;
+    grantedAt: string;
+  };
+}
+
+function normalizeDomainSlug(domain: string): "python" | "java" | "data-analytics" | "cybersecurity" {
+  const s = domain.toLowerCase();
+  if (s.includes("python")) return "python";
+  if (s.includes("java")) return "java";
+  if (s.includes("data") || s.includes("analytic")) return "data-analytics";
+  if (s.includes("cyber") || s.includes("security")) return "cybersecurity";
+  return "python";
+}
+
+/** Admin grants internship access to an application. */
+export async function grantInternshipAccess(
+  applicationId: string,
+  meta: { actor: string; requestId: string }
+): Promise<AccessGrantResult> {
+  const store = getStore();
+  const app = await store.getApplicationByAppId(applicationId);
+  if (!app) throw new AppError("NOT_FOUND", "Application not found.");
+
+  const now = new Date().toISOString();
+  const updated = await store.updateApplication(app.id, {
+    status: "PAYMENT_VERIFIED",
+    verifiedBy: meta.actor,
+    verifiedAt: app.verifiedAt || now,
+    updatedAt: now,
+  });
+
+  const verified = updated ?? app;
+  const domainSlug = normalizeDomainSlug(verified.domain);
+  const internId = `KTT/INT/2026/S${Math.floor(1000 + Math.random() * 9000)}`;
+  const activationCode = String(Math.floor(1000 + Math.random() * 9000));
+  const dashboardUrl = "https://kicktotech.in/internship/dashboard";
+
+  // If Firebase Admin is available, write to interns & manual_activations collections
+  if (isAdminConfigured()) {
+    try {
+      const db = await getAdminDb();
+      const internDoc = {
+        id: verified.id,
+        internId,
+        name: verified.name,
+        email: verified.email,
+        phone: verified.phone,
+        college: verified.college || "Kick To Tech Student",
+        domainId: domainSlug,
+        status: "ACTIVE",
+        paymentStatus: "PAID",
+        certificateStatus: "NOT_READY",
+        progress: 0,
+        mentorId: verified.mentorId,
+        joinedAt: verified.verifiedAt || now,
+        avatarColor: "#0057ff",
+      };
+
+      await Promise.allSettled([
+        db.collection("interns").doc(verified.id).set(internDoc, { merge: true }),
+        db.collection("ktt_interns").doc(verified.id).set(internDoc, { merge: true }),
+        db.collection("manual_activations").doc(`act_${verified.id}`).set({
+          id: `act_${verified.id}`,
+          code: activationCode,
+          internName: verified.name,
+          internEmail: verified.email,
+          domainId: domainSlug,
+          status: "AVAILABLE",
+          createdAt: now,
+          expiresAt: new Date(Date.now() + 90 * 864e5).toISOString(),
+        }, { merge: true }),
+        db.collection("ktt_manual_activations").doc(`act_${verified.id}`).set({
+          id: `act_${verified.id}`,
+          code: activationCode,
+          internName: verified.name,
+          internEmail: verified.email,
+          domainId: domainSlug,
+          status: "AVAILABLE",
+          createdAt: now,
+          expiresAt: new Date(Date.now() + 90 * 864e5).toISOString(),
+        }, { merge: true }),
+      ]);
+    } catch (err) {
+      console.warn("[applications] Could not write intern/activation records to Firestore:", err);
+    }
+  }
+
+  // Attempt confirmation email
+  sendApplicationConfirmationEmail(verified).catch(() => {});
+
+  await writeAudit({
+    actor: meta.actor,
+    action: "GRANT_INTERNSHIP_ACCESS",
+    target: applicationId,
+    requestId: meta.requestId,
+  });
+
+  return {
+    application: verified,
+    access: {
+      internId,
+      activationCode,
+      dashboardUrl,
+      grantedAt: now,
+    },
+  };
+}
+
+/** Admin updates details of any internship application (domain, amount, status, etc.). */
+export async function updateApplicationDetails(
+  applicationId: string,
+  patch: Partial<ApplicationRecord>,
+  meta: { actor: string; requestId: string }
+): Promise<ApplicationRecord> {
+  const store = getStore();
+  const app = await store.getApplicationByAppId(applicationId);
+  if (!app) throw new AppError("NOT_FOUND", "Application not found.");
+
+  const now = new Date().toISOString();
+  const updatePayload: Partial<ApplicationRecord> = {
+    ...patch,
+    updatedAt: now,
+  };
+
+  if (patch.status === "PAYMENT_VERIFIED" && !app.verifiedAt) {
+    updatePayload.verifiedAt = now;
+    updatePayload.verifiedBy = meta.actor;
+  }
+
+  const updated = await store.updateApplication(app.id, updatePayload);
+  if (!updated) throw new AppError("SERVER_ERROR", "Failed to update application.");
+
+  // If status is verified, grant access in background
+  if (patch.status === "PAYMENT_VERIFIED") {
+    grantInternshipAccess(applicationId, meta).catch((e) => {
+      console.warn("[applications] Background access sync on update failed:", e);
+    });
+  }
+
+  await writeAudit({
+    actor: meta.actor,
+    action: "UPDATE_APPLICATION",
+    target: applicationId,
+    requestId: meta.requestId,
+  });
+
+  return updated;
+}
+
+/** Admin directly creates an internship application record. */
+export async function createAdminApplication(
+  input: AdminCreateApplicationInput,
+  meta: { actor: string; requestId: string }
+): Promise<AccessGrantResult> {
+  const store = getStore();
+  const domain = input.domain.trim();
+  const mentor = input.mentorId ? { id: input.mentorId, name: input.mentorName || "" } : resolveMentorForDomain(normalizeCertificateDomain(domain));
+  const amount = typeof input.amount === "number" ? input.amount : defaultAmountForDomain(domain, false);
+  const now = new Date().toISOString();
+  const status = input.status || "PAYMENT_VERIFIED";
+
+  const record: ApplicationRecord = {
+    id: store.newId(),
+    applicationId: makeAppId(),
+    name: input.name,
+    email: input.email,
+    phone: input.phone,
+    college: input.college,
+    course: input.course,
+    year: input.year,
+    prn: input.prn,
+    domain,
+    mentorId: mentor?.id,
+    mentorName: mentor?.name,
+    amount,
+    status,
+    createdAt: now,
+    updatedAt: now,
+    dedupeKey: `${input.email.trim().toLowerCase()}:${domain}`,
+    reviewNote: input.reviewNote,
+    verifiedBy: status === "PAYMENT_VERIFIED" ? meta.actor : undefined,
+    verifiedAt: status === "PAYMENT_VERIFIED" ? now : undefined,
+  };
+
+  const created = await store.createApplication(record);
+
+  await writeAudit({
+    actor: meta.actor,
+    action: "ADMIN_CREATE_APPLICATION",
+    target: created.applicationId,
+    requestId: meta.requestId,
+  });
+
+  if (input.grantAccess || status === "PAYMENT_VERIFIED") {
+    return grantInternshipAccess(created.applicationId, meta);
+  }
+
+  return { application: created };
 }
 
 /** Link an issued certificate back to its application (marks CERTIFICATE_ISSUED). */

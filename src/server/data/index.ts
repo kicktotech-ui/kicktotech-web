@@ -143,8 +143,8 @@ export interface ApplicationRecord {
 
 /**
  * Normalizes an amount from any representation:
- * - numbers: 99, 449, 222, or paise (9900, 44900)
- * - strings: "99", "₹99", "99.00", "449", "₹449", "9900"
+ * - numbers: 99, 449, 222, or paise (9900, 44900, 22200)
+ * - strings: "99", "₹99", "99.00", "449", "₹449", "9900", "222"
  */
 export function parseRecordAmount(d: Record<string, unknown> | null | undefined, fallback: number): number {
   if (!d) return fallback;
@@ -154,8 +154,13 @@ export function parseRecordAmount(d: Record<string, unknown> | null | undefined,
     d.paidAmount ??
     d.amountPaid ??
     d.fee ??
+    d.fees ??
     d.price ??
-    d.totalAmount;
+    d.cost ??
+    d.charges ??
+    d.charge ??
+    d.totalAmount ??
+    d.total;
 
   if (typeof raw === "number") {
     if (raw === 9900) return 99;
@@ -173,6 +178,20 @@ export function parseRecordAmount(d: Record<string, unknown> | null | undefined,
     }
   }
   return fallback;
+}
+
+/**
+ * Standard default pricing per domain:
+ * - PromptWars Hackathon: ₹99
+ * - Data Analytics / Cybersecurity: ₹222
+ * - Python / Java / Other Internships: ₹449
+ */
+export function defaultAmountForDomain(domain?: string, isHack?: boolean): number {
+  if (isHack) return 99;
+  const d = String(domain || "").toLowerCase();
+  if (d.includes("hack") || d.includes("prompt") || d.includes("war")) return 99;
+  if (d.includes("data") || d.includes("analytic") || d.includes("cyber") || d.includes("security")) return 222;
+  return 449;
 }
 
 /**

@@ -3,7 +3,7 @@ import { getAdminDb } from "../firebase/admin";
 import {
   type DataStore, type UserRecord, type SessionRecord, type CertificateRecord, type AuditRecord,
   type CertificateStatus, type PageResult, type ApplicationRecord,
-  isHackathonRecord, parseRecordAmount,
+  isHackathonRecord, parseRecordAmount, defaultAmountForDomain,
 } from "./index";
 import { uuid } from "../crypto";
 
@@ -88,27 +88,87 @@ function mapIntern(id: string, d: Doc): UserRecord {
   };
 }
 
-function mergeApplicationRecords(existing: ApplicationRecord, incoming: ApplicationRecord): ApplicationRecord {
-  // Prefer verified or paid status over pending
-  let status = existing.status;
-  if (incoming.status === "PAYMENT_VERIFIED" || incoming.status === "CERTIFICATE_ISSUED") {
-    status = incoming.status;
-  } else if (existing.status === "PAYMENT_PENDING" && incoming.status !== "PAYMENT_PENDING") {
-    status = incoming.status;
+function extractLegacyDomain(d: Doc, isHack: boolean): string {
+  if (isHack) {
+    const raw = str(d.domain || d.domainId || d.event || d.eventName || d.program || "");
+    if (!raw || raw.toLowerCase() === "python" || raw.toLowerCase() === "java") return "hack2skill";
+    return raw;
   }
 
-  // Determine amount: prefer incoming if incoming is non-default or explicit
-  let amount = existing.amount;
-  if (incoming.amount && incoming.amount !== 449) {
-    amount = incoming.amount;
-  } else if (!amount || amount === 0) {
-    amount = incoming.amount || 449;
+  const candidates = [
+    d.domain,
+    d.domainId,
+    d.domainName,
+    d.internshipDomain,
+    d.selectedDomain,
+    d.course,
+    d.courseTitle,
+    d.courseName,
+    d.track,
+    d.selectedTrack,
+    d.internshipTrack,
+    d.internship,
+    d.program,
+    d.programName,
+    d.specialization,
+    d.branch,
+    d.stream,
+    d.department,
+    d.subject,
+    d.field,
+  ];
+
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) {
+      const s = c.trim();
+      const lower = s.toLowerCase();
+      if (lower.includes("python")) return "python";
+      if (lower.includes("java")) return "java";
+      if (lower.includes("data") || lower.includes("analytic")) return "data-analytics";
+      if (lower.includes("cyber") || lower.includes("security")) return "cybersecurity";
+      if (lower.includes("web") || lower.includes("fullstack") || lower.includes("full-stack")) return "web-development";
+      if (s.length > 2 && !lower.includes("none") && !lower.includes("n/a") && !lower.includes("unknown")) {
+        return s;
+      }
+    }
+  }
+
+  return "python";
+}
+
+function mergeApplicationRecords(existing: ApplicationRecord, incoming: ApplicationRecord): ApplicationRecord {
+  // Prefer terminal or higher status
+  const statusRank: Record<ApplicationRecord["status"], number> = {
+    PAYMENT_PENDING: 1,
+    PAYMENT_REJECTED: 2,
+    PAYMENT_PROOF_SUBMITTED: 3,
+    PAYMENT_VERIFIED: 4,
+    CERTIFICATE_ISSUED: 5,
+  };
+  const status =
+    statusRank[incoming.status] > statusRank[existing.status]
+      ? incoming.status
+      : existing.status;
+
+  // Domain: prefer specific domain over fallback 'python'
+  let domain = existing.domain;
+  if (!domain || domain === "python") {
+    domain = incoming.domain || existing.domain || "python";
+  } else if (incoming.domain && incoming.domain !== "python") {
+    domain = incoming.domain;
+  }
+
+  // Determine amount: prefer explicit non-zero, or domain default
+  let amount = incoming.amount && incoming.amount > 0 ? incoming.amount : existing.amount;
+  if (!amount || amount === 0) {
+    amount = defaultAmountForDomain(domain, false);
   }
 
   return {
     ...incoming,
     ...existing,
     status,
+    domain,
     amount,
     name: existing.name && existing.name !== "Participant" ? existing.name : incoming.name,
     email: existing.email || incoming.email,
@@ -118,7 +178,6 @@ function mergeApplicationRecords(existing: ApplicationRecord, incoming: Applicat
     year: existing.year || incoming.year,
     teamName: existing.teamName || incoming.teamName,
     schoolName: existing.schoolName || incoming.schoolName || existing.teamName || incoming.teamName,
-    domain: existing.domain && existing.domain !== "python" ? existing.domain : incoming.domain,
     razorpayOrderId: existing.razorpayOrderId || incoming.razorpayOrderId,
     razorpayPaymentId: existing.razorpayPaymentId || incoming.razorpayPaymentId,
     razorpaySignature: existing.razorpaySignature || incoming.razorpaySignature,
@@ -136,12 +195,20 @@ function mapLegacyApplication(id: string, d: Doc): ApplicationRecord {
   const isHack = isHackathonRecord(d);
 
   const rawStatus = str(d.status || d.state || "").toUpperCase();
-  const rawPayment = str(d.paymentStatus || d.payment_status || d.orderStatus || "").toUpperCase();
+  const rawPayment = str(d.paymentStatus || d.payment_status || d.orderStatus || d.payment || "").toUpperCase();
+  const isPaidBool = d.isPaid === true || d.paid === true || d.verified === true || d.isVerified === true || d.approved === true || d.isApproved === true;
+  const hasPaymentRef = Boolean(
+    d.razorpayPaymentId || d.razorpay_payment_id || d.paymentId || d.payment_id ||
+    d.transactionId || d.txnId || d.utr || d.bankRef || d.referenceId
+  );
+
   let status: ApplicationRecord["status"] = "PAYMENT_PENDING";
 
   if (rawStatus === "CERTIFICATE_ISSUED" || d.certificate || d.certificateId) {
     status = "CERTIFICATE_ISSUED";
   } else if (
+    isPaidBool ||
+    hasPaymentRef ||
     rawPayment.includes("PAID") ||
     rawPayment.includes("CAPTURED") ||
     rawPayment.includes("SUCCESS") ||
@@ -150,7 +217,8 @@ function mapLegacyApplication(id: string, d: Doc): ApplicationRecord {
     rawStatus === "ACTIVE" ||
     rawStatus === "PAID" ||
     rawStatus === "COMPLETED" ||
-    Boolean(d.razorpayPaymentId || d.razorpay_payment_id || d.paymentId)
+    rawStatus === "CONFIRMED" ||
+    rawStatus === "ENROLLED"
   ) {
     status = "PAYMENT_VERIFIED";
   } else if (rawStatus.includes("REJECT") || rawPayment.includes("FAIL") || rawStatus.includes("CANCEL")) {
@@ -160,16 +228,9 @@ function mapLegacyApplication(id: string, d: Doc): ApplicationRecord {
   }
 
   // Domain / Event:
-  let domain = str(d.domain || d.domainId || d.event || d.eventName || d.program || "");
-  if (isHack) {
-    if (!domain || domain === "python" || domain === "java") {
-      domain = "hack2skill";
-    }
-  } else {
-    if (!domain) domain = "python";
-  }
+  const domain = extractLegacyDomain(d, isHack);
 
-  const defaultAmount = isHack ? 99 : 449;
+  const defaultAmount = defaultAmountForDomain(domain, isHack);
   const amount = parseRecordAmount(d, defaultAmount);
 
   const createdAt = toIso(d.createdAt || d.appliedAt || d.registeredAt || d.date || d.timestamp || d.paidAt || new Date().toISOString());

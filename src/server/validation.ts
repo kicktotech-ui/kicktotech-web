@@ -86,11 +86,44 @@ export const paymentProofSchema = z.object({
   applicationId: z.string().trim().min(4).max(64),
 });
 
-/** Admin payment decision. */
+/** Admin payment decision & lifecycle actions (verify, reject, grant_access, update). */
 export const applicationDecisionSchema = z.object({
   applicationId: z.string().trim().min(4).max(64),
-  action: z.enum(["verify", "reject"]),
-  reason: z.string().trim().max(240).optional(),
+  action: z.enum(["verify", "reject", "grant_access", "update"]),
+  reason: z.string().trim().max(400).optional(),
+  patch: z.object({
+    name: z.string().trim().min(2).max(120).optional(),
+    email: emailSchema.optional(),
+    phone: z.string().trim().max(30).optional(),
+    college: z.string().trim().max(160).optional(),
+    course: z.string().trim().max(120).optional(),
+    year: z.string().trim().max(40).optional(),
+    prn: z.string().trim().max(60).optional(),
+    domain: z.string().trim().min(1).optional(),
+    amount: z.number().nonnegative().optional(),
+    status: z.enum(["PAYMENT_PENDING", "PAYMENT_PROOF_SUBMITTED", "PAYMENT_VERIFIED", "PAYMENT_REJECTED", "CERTIFICATE_ISSUED"]).optional(),
+    mentorId: z.string().trim().max(64).optional(),
+    mentorName: z.string().trim().max(120).optional(),
+    reviewNote: z.string().trim().max(400).optional(),
+  }).optional(),
+});
+
+/** Admin direct creation of an internship application record. */
+export const adminCreateApplicationSchema = z.object({
+  name: z.string().trim().min(2, "Enter full name.").max(120),
+  email: emailSchema,
+  phone: z.string().trim().min(4, "Enter phone number.").max(30),
+  college: z.string().trim().max(160).optional(),
+  course: z.string().trim().max(120).optional(),
+  year: z.string().trim().max(40).optional(),
+  prn: z.string().trim().max(60).optional(),
+  domain: z.string().trim().min(1, "Select or enter a domain."),
+  amount: z.number().nonnegative().optional(),
+  status: z.enum(["PAYMENT_PENDING", "PAYMENT_PROOF_SUBMITTED", "PAYMENT_VERIFIED", "PAYMENT_REJECTED", "CERTIFICATE_ISSUED"]).default("PAYMENT_VERIFIED"),
+  mentorId: z.string().trim().max(64).optional(),
+  mentorName: z.string().trim().max(120).optional(),
+  reviewNote: z.string().trim().max(400).optional(),
+  grantAccess: z.boolean().default(true),
 });
 
 /** Razorpay order creation request. */
@@ -110,6 +143,7 @@ export type ApplicationInput = z.infer<typeof applicationSchema>;
 export type HackathonApplicationInput = z.infer<typeof hackathonApplicationSchema>;
 export type PaymentProofInput = z.infer<typeof paymentProofSchema>;
 export type ApplicationDecisionInput = z.infer<typeof applicationDecisionSchema>;
+export type AdminCreateApplicationInput = z.infer<typeof adminCreateApplicationSchema>;
 export type RazorpayOrderCreateInput = z.infer<typeof razorpayOrderCreateSchema>;
 export type RazorpayPaymentVerifyInput = z.infer<typeof razorpayPaymentVerifySchema>;
 

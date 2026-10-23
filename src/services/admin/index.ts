@@ -62,6 +62,7 @@ export interface AdminApplication {
   college?: string;
   course?: string;
   year?: string;
+  prn?: string;
   teamName?: string;
   domain: string;
   mentorId?: string;
@@ -83,6 +84,33 @@ export interface ApplicationQueryParams extends QueryParams {
   confirmed?: boolean;
 }
 
+export interface AdminCreateApplicationPayload {
+  name: string;
+  email: string;
+  phone: string;
+  college?: string;
+  course?: string;
+  year?: string;
+  prn?: string;
+  domain: string;
+  amount?: number;
+  status?: AdminApplicationStatus;
+  mentorId?: string;
+  mentorName?: string;
+  reviewNote?: string;
+  grantAccess?: boolean;
+}
+
+export interface AccessResult {
+  application: AdminApplication;
+  access?: {
+    internId: string;
+    activationCode: string;
+    dashboardUrl: string;
+    grantedAt: string;
+  };
+}
+
 export const adminApplicationService = {
   async query(params: ApplicationQueryParams = {}): Promise<Paginated<AdminApplication>> {
     const q = new URLSearchParams();
@@ -93,12 +121,31 @@ export const adminApplicationService = {
     if (params.confirmed) q.set("confirmed", "true");
     const status = params.filters?.status;
     if (status) q.set("status", status);
+    const domain = params.filters?.domain;
+    if (domain) q.set("domain", domain);
     try {
       const data = await api.get<{ rows: AdminApplication[]; total: number; page: number; pageSize: number }>(`/admin/applications?${q.toString()}`);
       return { rows: data.rows, total: data.total, page: data.page, pageSize: data.pageSize };
     } catch {
       return { rows: [], total: 0, page: params.page ?? 1, pageSize: params.pageSize ?? 10 };
     }
+  },
+  async create(payload: AdminCreateApplicationPayload): Promise<AccessResult> {
+    return api.post<AccessResult>("/admin/applications", payload);
+  },
+  async update(applicationId: string, patch: Partial<AdminApplication>): Promise<AdminApplication> {
+    const res = await api.patch<{ application: AdminApplication }>("/admin/applications", {
+      applicationId,
+      action: "update",
+      patch,
+    });
+    return res.application;
+  },
+  async grantAccess(applicationId: string): Promise<AccessResult> {
+    return api.patch<AccessResult>("/admin/applications", {
+      applicationId,
+      action: "grant_access",
+    });
   },
   async decide(applicationId: string, action: "verify" | "reject", reason?: string): Promise<AdminApplication> {
     const { application } = await api.patch<{ application: AdminApplication }>("/admin/applications", { applicationId, action, reason });
