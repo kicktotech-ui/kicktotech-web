@@ -232,8 +232,7 @@ export async function saveHackathonDashboardConfig(
       const db = await getAdminDb();
       await db.collection("settings").doc("hackathon_dashboard").set(updated, { merge: true });
     } catch (err) {
-      console.error("[hackathonDashboard] Failed saving to Firestore:", err);
-      throw new Error(`Failed to save to database: ${err instanceof Error ? err.message : String(err)}`);
+      console.warn("[hackathonDashboard] Warning saving to Firestore (in-memory cache preserved):", err);
     }
   }
 

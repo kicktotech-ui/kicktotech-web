@@ -26,6 +26,7 @@ import {
   RefreshCw,
   Copy,
   Check,
+  Link as LinkIcon,
 } from "lucide-react";
 import { RequireAuth } from "@/components/dashboard/RequireAuth";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
@@ -646,6 +647,12 @@ function DashboardContent() {
                         <p className="mt-1 text-xs text-muted leading-relaxed">
                           {res.description}
                         </p>
+                      )}
+                      {res.url && res.url !== "#" && (
+                        <span className="mt-2.5 inline-flex items-center gap-1 font-mono text-[11px] text-accent hover:underline break-all">
+                          <LinkIcon className="h-3 w-3 flex-shrink-0" />
+                          {res.url}
+                        </span>
                       )}
                     </div>
                   </a>

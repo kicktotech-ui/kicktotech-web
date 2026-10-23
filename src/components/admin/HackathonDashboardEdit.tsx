@@ -153,14 +153,21 @@ export function HackathonDashboardEdit() {
 
   async function handleAddScheduleItem(e?: React.FormEvent) {
     if (e) e.preventDefault();
-    const title = newScheduleTitle.trim();
-    if (!title) {
-      toast.error("Please enter a Title for the schedule milestone.");
+    if (!config) {
+      toast.error("Dashboard configuration is not loaded yet.");
       return;
     }
-    if (!config) return;
 
-    const time = newScheduleTime.trim() || "TBD";
+    const rawTitle = newScheduleTitle.trim();
+    const rawTime = newScheduleTime.trim();
+
+    if (!rawTitle && !rawTime) {
+      toast.error("Please enter a Title or Time for the schedule milestone.");
+      return;
+    }
+
+    const title = rawTitle || (rawTime ? `Milestone at ${rawTime}` : "Event Milestone");
+    const time = rawTime || "TBD";
     const desc = newScheduleDesc.trim() || undefined;
 
     const newItem: HackathonScheduleItem = {
@@ -176,12 +183,14 @@ export function HackathonDashboardEdit() {
       schedule: [...config.schedule, newItem],
     };
 
+    // 1. Update React state immediately so user sees the new item right away
     setConfig(updatedConfig);
     setNewScheduleTime("");
     setNewScheduleTitle("");
     setNewScheduleDesc("");
     setNewScheduleStatus("upcoming");
 
+    // 2. Persist to backend
     try {
       await handleSave(updatedConfig, `Milestone "${title}" added and published live!`);
     } catch {
@@ -293,20 +302,38 @@ export function HackathonDashboardEdit() {
 
   async function handleAddResource(e?: React.FormEvent) {
     if (e) e.preventDefault();
-    const title = newResTitle.trim();
-    if (!title) {
-      toast.error("Please enter a Title for the resource or guideline.");
+    if (!config) {
+      toast.error("Dashboard configuration is not loaded yet.");
       return;
     }
 
     let url = newResUrl.trim();
-    if (!url) {
-      url = "#";
-    } else if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("#")) {
+    let title = newResTitle.trim();
+
+    if (!title && !url) {
+      toast.error("Please enter a Title or URL for the resource.");
+      return;
+    }
+
+    if (url && !url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("#")) {
       url = `https://${url}`;
     }
 
-    if (!config) return;
+    if (!title) {
+      if (url.includes("drive.google.com")) title = "Google Drive Folder";
+      else if (url.includes("docs.google.com/presentation")) title = "Presentation Template";
+      else if (url.includes("docs.google.com")) title = "Document / Guidelines";
+      else if (url.includes("whatsapp.com")) title = "WhatsApp Participant Community";
+      else if (url.includes("discord")) title = "Discord Server";
+      else if (url.includes("github.com")) title = "GitHub Repository";
+      else if (url.includes("hack2skill.com")) title = "Hack2Skill Event Portal";
+      else if (url && url !== "#") title = "Important Resource Link";
+      else title = "Participant Guideline";
+    }
+
+    if (!url) {
+      url = "#";
+    }
 
     const desc = newResDesc.trim() || undefined;
 
@@ -323,12 +350,14 @@ export function HackathonDashboardEdit() {
       resources: [...config.resources, newRes],
     };
 
+    // 1. Update React state immediately so user sees the new resource right away
     setConfig(updatedConfig);
     setNewResTitle("");
     setNewResUrl("");
     setNewResDesc("");
     setNewResType("link");
 
+    // 2. Persist to backend
     try {
       await handleSave(updatedConfig, `Resource "${title}" added and published live!`);
     } catch {
@@ -857,10 +886,7 @@ export function HackathonDashboardEdit() {
         </div>
 
         {/* Add New Schedule Item */}
-        <form
-          onSubmit={handleAddScheduleItem}
-          className="mt-6 rounded-xl border border-dashed border-adm-border bg-adm-surface/60 p-4"
-        >
+        <div className="mt-6 rounded-xl border border-dashed border-adm-border bg-adm-surface/60 p-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-adm-fg flex items-center gap-1.5">
               <Plus className="h-4 w-4 text-accent" /> Add New Schedule Milestone
@@ -875,15 +901,26 @@ export function HackathonDashboardEdit() {
               <Input
                 value={newScheduleTime}
                 onChange={(e) => setNewScheduleTime(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddScheduleItem();
+                  }
+                }}
                 placeholder="e.g. 02:00 PM (or leave blank for TBD)"
               />
             </Field>
-            <Field label="Milestone Title *" className="sm:col-span-2">
+            <Field label="Milestone Title" className="sm:col-span-2">
               <Input
                 value={newScheduleTitle}
                 onChange={(e) => setNewScheduleTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddScheduleItem();
+                  }
+                }}
                 placeholder="e.g. Mentorship Review Round 2"
-                required
               />
             </Field>
             <Field label="Initial Status">
@@ -905,22 +942,29 @@ export function HackathonDashboardEdit() {
               <Input
                 value={newScheduleDesc}
                 onChange={(e) => setNewScheduleDesc(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddScheduleItem();
+                  }
+                }}
                 placeholder="Details, guidelines, or what happens during this round..."
               />
             </Field>
             <div className="sm:self-end">
               <Button
-                type="submit"
+                type="button"
                 variant="info"
                 disabled={saving}
-                className="w-full sm:w-auto h-10 px-4"
+                onClick={() => handleAddScheduleItem()}
+                className="w-full sm:w-auto h-10 px-5 font-bold shadow-sm"
               >
                 <Plus className="h-4 w-4" />
-                {saving ? "Adding & Saving..." : "Add & Publish Milestone"}
+                {saving ? "Adding & Saving..." : "Add Milestone"}
               </Button>
             </div>
           </div>
-        </form>
+        </div>
       </Card>
 
       {/* Card 4: Resources & Guidelines (With FULL Editing Support) */}
@@ -1080,10 +1124,7 @@ export function HackathonDashboardEdit() {
         </div>
 
         {/* Add Resource */}
-        <form
-          onSubmit={handleAddResource}
-          className="mt-6 rounded-xl border border-dashed border-adm-border bg-adm-surface/60 p-4"
-        >
+        <div className="mt-6 rounded-xl border border-dashed border-adm-border bg-adm-surface/60 p-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-adm-fg flex items-center gap-1.5">
               <Plus className="h-4 w-4 text-accent" /> Add Resource or Guideline Link
@@ -1094,18 +1135,29 @@ export function HackathonDashboardEdit() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
-            <Field label="Resource Title *">
+            <Field label="Resource Title">
               <Input
                 value={newResTitle}
                 onChange={(e) => setNewResTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddResource();
+                  }
+                }}
                 placeholder="e.g. Problem Statements & Tracks"
-                required
               />
             </Field>
             <Field label="URL / Link">
               <Input
                 value={newResUrl}
                 onChange={(e) => setNewResUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddResource();
+                  }
+                }}
                 placeholder="e.g. drive.google.com/... or https://..."
               />
             </Field>
@@ -1129,22 +1181,29 @@ export function HackathonDashboardEdit() {
               <Input
                 value={newResDesc}
                 onChange={(e) => setNewResDesc(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddResource();
+                  }
+                }}
                 placeholder="Description (optional notes for participants)"
               />
             </Field>
             <div className="sm:self-end">
               <Button
-                type="submit"
+                type="button"
                 variant="info"
                 disabled={saving}
-                className="w-full sm:w-auto h-10 px-4"
+                onClick={() => handleAddResource()}
+                className="w-full sm:w-auto h-10 px-5 font-bold shadow-sm"
               >
                 <Plus className="h-4 w-4" />
-                {saving ? "Adding & Saving..." : "Add & Publish Resource"}
+                {saving ? "Adding & Saving..." : "Add Resource Link"}
               </Button>
             </div>
           </div>
-        </form>
+        </div>
       </Card>
 
       {/* Floating Bottom Save Bar */}
