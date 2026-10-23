@@ -141,10 +141,10 @@ export async function getHackathonDashboardConfig(): Promise<HackathonDashboardC
         const merged: HackathonDashboardConfig = {
           ...DEFAULT_HACKATHON_DASHBOARD_CONFIG,
           ...data,
-          schedule: Array.isArray(data.schedule) && data.schedule.length > 0
+          schedule: Array.isArray(data.schedule)
             ? data.schedule
             : DEFAULT_HACKATHON_DASHBOARD_CONFIG.schedule,
-          resources: Array.isArray(data.resources) && data.resources.length > 0
+          resources: Array.isArray(data.resources)
             ? data.resources
             : DEFAULT_HACKATHON_DASHBOARD_CONFIG.resources,
         };
@@ -181,35 +181,27 @@ export async function saveHackathonDashboardConfig(
     return String(v).trim();
   };
 
-  const safeOptStr = (v: unknown, fallback?: string): string | undefined => {
-    if (v === null || v === "") return undefined;
-    if (typeof v === "string") return v.trim() || undefined;
-    return fallback;
-  };
-
   const sanitizedSchedule: HackathonScheduleItem[] = Array.isArray(patch.schedule)
-    ? patch.schedule.map((item, index) => ({
-        id: item.id || `sch-${Date.now()}-${index}`,
-        time: safeStr(item.time, "TBD"),
-        title: safeStr(item.title, "Schedule Item"),
-        description: safeOptStr(item.description),
-        status: (item.status === "live" || item.status === "completed" ? item.status : "upcoming") as "upcoming" | "live" | "completed",
+    ? patch.schedule.map((item: any, index: number) => ({
+        id: item?.id ? String(item.id) : `sch-${Date.now()}-${index}`,
+        time: safeStr(item?.time, "TBD"),
+        title: safeStr(item?.title, "Milestone"),
+        description: item?.description ? String(item.description).trim() : "",
+        status: (item?.status === "live" || item?.status === "completed" ? item.status : "upcoming") as "upcoming" | "live" | "completed",
       }))
     : current.schedule;
 
   const sanitizedResources: HackathonResourceItem[] = Array.isArray(patch.resources)
-    ? patch.resources.map((item, index) => ({
-        id: item.id || `res-${Date.now()}-${index}`,
-        title: safeStr(item.title, "Resource"),
-        url: safeStr(item.url, "#"),
-        description: safeOptStr(item.description),
-        type: (item.type === "document" || item.type === "code" || item.type === "community" ? item.type : "link") as "link" | "document" | "code" | "community",
+    ? patch.resources.map((item: any, index: number) => ({
+        id: item?.id ? String(item.id) : `res-${Date.now()}-${index}`,
+        title: safeStr(item?.title, "Resource"),
+        url: safeStr(item?.url, "#"),
+        description: item?.description ? String(item.description).trim() : "",
+        type: (item?.type === "document" || item?.type === "code" || item?.type === "community" ? item.type : "link") as "link" | "document" | "code" | "community",
       }))
     : current.resources;
 
   const updated: HackathonDashboardConfig = {
-    ...current,
-    ...patch,
     eventName: safeStr(patch.eventName, current.eventName),
     tagline: safeStr(patch.tagline, current.tagline),
     description: safeStr(patch.description, current.description),
@@ -220,14 +212,14 @@ export async function saveHackathonDashboardConfig(
     mode: safeStr(patch.mode, current.mode),
     theme: safeStr(patch.theme, current.theme),
     prizePool: safeStr(patch.prizePool, current.prizePool),
-    announcement: safeOptStr(patch.announcement, current.announcement),
-    announcementActive: patch.announcementActive !== undefined ? Boolean(patch.announcementActive) : current.announcementActive,
-    whatsappGroupUrl: safeOptStr(patch.whatsappGroupUrl, current.whatsappGroupUrl),
-    discordUrl: safeOptStr(patch.discordUrl, current.discordUrl),
-    officialPortalUrl: safeOptStr(patch.officialPortalUrl, current.officialPortalUrl),
-    submissionUrl: safeOptStr(patch.submissionUrl, current.submissionUrl),
-    contactEmail: safeOptStr(patch.contactEmail, current.contactEmail),
-    contactPhone: safeOptStr(patch.contactPhone, current.contactPhone),
+    announcement: safeStr(patch.announcement ?? current.announcement, ""),
+    announcementActive: patch.announcementActive !== undefined ? Boolean(patch.announcementActive) : (current.announcementActive ?? true),
+    whatsappGroupUrl: safeStr(patch.whatsappGroupUrl ?? current.whatsappGroupUrl, ""),
+    discordUrl: safeStr(patch.discordUrl ?? current.discordUrl, ""),
+    officialPortalUrl: safeStr(patch.officialPortalUrl ?? current.officialPortalUrl, ""),
+    submissionUrl: safeStr(patch.submissionUrl ?? current.submissionUrl, ""),
+    contactEmail: safeStr(patch.contactEmail ?? current.contactEmail, ""),
+    contactPhone: safeStr(patch.contactPhone ?? current.contactPhone, ""),
     schedule: sanitizedSchedule,
     resources: sanitizedResources,
     updatedAt: new Date().toISOString(),
@@ -241,6 +233,7 @@ export async function saveHackathonDashboardConfig(
       await db.collection("settings").doc("hackathon_dashboard").set(updated, { merge: true });
     } catch (err) {
       console.error("[hackathonDashboard] Failed saving to Firestore:", err);
+      throw new Error(`Failed to save to database: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 

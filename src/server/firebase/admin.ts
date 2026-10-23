@@ -50,7 +50,7 @@ export async function getAdminDb(): Promise<Firestore> {
   // avoids channel contention on rapid sequential reads. Safe to call once,
   // before the first operation; ignore if settings were already applied.
   try {
-    db.settings({ preferRest: true });
+    db.settings({ preferRest: true, ignoreUndefinedProperties: true });
   } catch {
     /* settings already frozen on a reused app — fine */
   }

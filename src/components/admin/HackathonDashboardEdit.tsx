@@ -88,7 +88,7 @@ export function HackathonDashboardEdit() {
   }, [toast]);
 
   // Master save function
-  async function handleSave(overrideConfig?: HackathonDashboardConfig) {
+  async function handleSave(overrideConfig?: HackathonDashboardConfig, successMessage?: string) {
     const target = overrideConfig || config;
     if (!target) return;
     setSaving(true);
@@ -96,10 +96,15 @@ export function HackathonDashboardEdit() {
       const updated = await adminHackathonService.updateDashboardConfig(target);
       setConfig(updated);
       setHasUnsavedChanges(false);
-      toast.success("Hackathon dashboard updated successfully! Live on participant dashboards.");
+      toast.success(
+        successMessage || "Hackathon dashboard updated successfully! Live on participant dashboards.",
+      );
+      return updated;
     } catch (err) {
       console.error("Save error:", err);
-      toast.error(err instanceof Error ? err.message : "Failed to save changes. Please try again.");
+      const msg = err instanceof Error ? err.message : "Failed to save changes. Please try again.";
+      toast.error(msg);
+      throw err;
     } finally {
       setSaving(false);
     }
@@ -117,41 +122,56 @@ export function HackathonDashboardEdit() {
     setEditingScheduleItem(null);
   }
 
-  function handleSaveEditSchedule() {
+  async function handleSaveEditSchedule() {
     if (!editingScheduleItem || !config) return;
-    if (!editingScheduleItem.time.trim() || !editingScheduleItem.title.trim()) {
-      toast.error("Milestone time and title cannot be blank.");
+    const title = editingScheduleItem.title.trim();
+    if (!title) {
+      toast.error("Milestone title cannot be blank.");
       return;
     }
 
+    const time = editingScheduleItem.time.trim() || "TBD";
+    const desc = editingScheduleItem.description?.trim() || undefined;
+
     const updatedSchedule = config.schedule.map((item) =>
-      item.id === editingScheduleItem.id ? { ...editingScheduleItem } : item,
+      item.id === editingScheduleItem.id
+        ? { ...editingScheduleItem, title, time, description: desc }
+        : item,
     );
 
-    const updatedConfig = { ...config, schedule: updatedSchedule };
+    const updatedConfig: HackathonDashboardConfig = { ...config, schedule: updatedSchedule };
     setConfig(updatedConfig);
     setEditingScheduleId(null);
     setEditingScheduleItem(null);
-    setHasUnsavedChanges(true);
-    toast.info("Schedule item updated locally. Click 'Save Dashboard Changes' to publish.");
+
+    try {
+      await handleSave(updatedConfig, `Milestone "${title}" updated and published!`);
+    } catch {
+      setHasUnsavedChanges(true);
+    }
   }
 
-  function handleAddScheduleItem() {
-    if (!newScheduleTime.trim() || !newScheduleTitle.trim()) {
-      toast.error("Please enter both Time and Title for the schedule milestone.");
+  async function handleAddScheduleItem(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    const title = newScheduleTitle.trim();
+    if (!title) {
+      toast.error("Please enter a Title for the schedule milestone.");
       return;
     }
     if (!config) return;
 
+    const time = newScheduleTime.trim() || "TBD";
+    const desc = newScheduleDesc.trim() || undefined;
+
     const newItem: HackathonScheduleItem = {
-      id: `sch-${Date.now()}`,
-      time: newScheduleTime.trim(),
-      title: newScheduleTitle.trim(),
-      description: newScheduleDesc.trim() || undefined,
+      id: `sch-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      time,
+      title,
+      description: desc,
       status: newScheduleStatus,
     };
 
-    const updatedConfig = {
+    const updatedConfig: HackathonDashboardConfig = {
       ...config,
       schedule: [...config.schedule, newItem],
     };
@@ -161,22 +181,35 @@ export function HackathonDashboardEdit() {
     setNewScheduleTitle("");
     setNewScheduleDesc("");
     setNewScheduleStatus("upcoming");
-    setHasUnsavedChanges(true);
-    toast.success("Schedule milestone added. Click 'Save Dashboard Changes' to publish.");
+
+    try {
+      await handleSave(updatedConfig, `Milestone "${title}" added and published live!`);
+    } catch {
+      setHasUnsavedChanges(true);
+    }
   }
 
-  function handleRemoveScheduleItem(id: string) {
+  async function handleRemoveScheduleItem(id: string) {
     if (!config) return;
-    const updatedConfig = {
+    const itemToRemove = config.schedule.find((s) => s.id === id);
+    const updatedSchedule = config.schedule.filter((s) => s.id !== id);
+    const updatedConfig: HackathonDashboardConfig = {
       ...config,
-      schedule: config.schedule.filter((s) => s.id !== id),
+      schedule: updatedSchedule,
     };
     setConfig(updatedConfig);
-    setHasUnsavedChanges(true);
-    toast.info("Schedule milestone removed. Click 'Save Dashboard Changes' to publish.");
+
+    try {
+      await handleSave(
+        updatedConfig,
+        `Milestone "${itemToRemove?.title || "Item"}" removed and published!`,
+      );
+    } catch {
+      setHasUnsavedChanges(true);
+    }
   }
 
-  function handleMoveScheduleItem(index: number, direction: "up" | "down") {
+  async function handleMoveScheduleItem(index: number, direction: "up" | "down") {
     if (!config) return;
     const targetIndex = direction === "up" ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= config.schedule.length) return;
@@ -185,18 +218,30 @@ export function HackathonDashboardEdit() {
     const [moved] = newSchedule.splice(index, 1);
     newSchedule.splice(targetIndex, 0, moved);
 
-    setConfig({ ...config, schedule: newSchedule });
-    setHasUnsavedChanges(true);
+    const updatedConfig: HackathonDashboardConfig = { ...config, schedule: newSchedule };
+    setConfig(updatedConfig);
+
+    try {
+      await handleSave(updatedConfig, "Milestone order updated and published!");
+    } catch {
+      setHasUnsavedChanges(true);
+    }
   }
 
-  function handleQuickStatusChange(id: string, status: "upcoming" | "live" | "completed") {
+  async function handleQuickStatusChange(id: string, status: "upcoming" | "live" | "completed") {
     if (!config) return;
-    const updatedConfig = {
+    const updatedSchedule = config.schedule.map((s) => (s.id === id ? { ...s, status } : s));
+    const updatedConfig: HackathonDashboardConfig = {
       ...config,
-      schedule: config.schedule.map((s) => (s.id === id ? { ...s, status } : s)),
+      schedule: updatedSchedule,
     };
     setConfig(updatedConfig);
-    setHasUnsavedChanges(true);
+
+    try {
+      await handleSave(updatedConfig, `Milestone status changed to "${status}" and published!`);
+    } catch {
+      setHasUnsavedChanges(true);
+    }
   }
 
   // --- Resource Item Handlers ---
@@ -211,33 +256,46 @@ export function HackathonDashboardEdit() {
     setEditingResItem(null);
   }
 
-  function handleSaveEditResource() {
+  async function handleSaveEditResource() {
     if (!editingResItem || !config) return;
-    if (!editingResItem.title.trim()) {
+    const title = editingResItem.title.trim();
+    if (!title) {
       toast.error("Resource title is required.");
       return;
     }
 
     let url = editingResItem.url.trim();
-    if (url && !url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("#")) {
+    if (!url) {
+      url = "#";
+    } else if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("#")) {
       url = `https://${url}`;
     }
 
+    const desc = editingResItem.description?.trim() || undefined;
+
     const updatedResources = config.resources.map((item) =>
-      item.id === editingResItem.id ? { ...editingResItem, url } : item,
+      item.id === editingResItem.id
+        ? { ...editingResItem, title, url, description: desc }
+        : item,
     );
 
-    const updatedConfig = { ...config, resources: updatedResources };
+    const updatedConfig: HackathonDashboardConfig = { ...config, resources: updatedResources };
     setConfig(updatedConfig);
     setEditingResId(null);
     setEditingResItem(null);
-    setHasUnsavedChanges(true);
-    toast.info("Resource updated locally. Click 'Save Dashboard Changes' to publish.");
+
+    try {
+      await handleSave(updatedConfig, `Resource "${title}" updated and published!`);
+    } catch {
+      setHasUnsavedChanges(true);
+    }
   }
 
-  function handleAddResource() {
-    if (!newResTitle.trim()) {
-      toast.error("Please enter a Title for the resource.");
+  async function handleAddResource(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    const title = newResTitle.trim();
+    if (!title) {
+      toast.error("Please enter a Title for the resource or guideline.");
       return;
     }
 
@@ -250,15 +308,17 @@ export function HackathonDashboardEdit() {
 
     if (!config) return;
 
+    const desc = newResDesc.trim() || undefined;
+
     const newRes: HackathonResourceItem = {
-      id: `res-${Date.now()}`,
-      title: newResTitle.trim(),
+      id: `res-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      title,
       url,
-      description: newResDesc.trim() || undefined,
+      description: desc,
       type: newResType,
     };
 
-    const updatedConfig = {
+    const updatedConfig: HackathonDashboardConfig = {
       ...config,
       resources: [...config.resources, newRes],
     };
@@ -268,19 +328,32 @@ export function HackathonDashboardEdit() {
     setNewResUrl("");
     setNewResDesc("");
     setNewResType("link");
-    setHasUnsavedChanges(true);
-    toast.success("Resource added. Click 'Save Dashboard Changes' to publish.");
+
+    try {
+      await handleSave(updatedConfig, `Resource "${title}" added and published live!`);
+    } catch {
+      setHasUnsavedChanges(true);
+    }
   }
 
-  function handleRemoveResource(id: string) {
+  async function handleRemoveResource(id: string) {
     if (!config) return;
-    const updatedConfig = {
+    const resToRemove = config.resources.find((r) => r.id === id);
+    const updatedResources = config.resources.filter((r) => r.id !== id);
+    const updatedConfig: HackathonDashboardConfig = {
       ...config,
-      resources: config.resources.filter((r) => r.id !== id),
+      resources: updatedResources,
     };
     setConfig(updatedConfig);
-    setHasUnsavedChanges(true);
-    toast.info("Resource removed. Click 'Save Dashboard Changes' to publish.");
+
+    try {
+      await handleSave(
+        updatedConfig,
+        `Resource "${resToRemove?.title || "Item"}" removed and published!`,
+      );
+    } catch {
+      setHasUnsavedChanges(true);
+    }
   }
 
   if (loading || !config) {
@@ -623,8 +696,8 @@ export function HackathonDashboardEdit() {
                       Editing Milestone #{index + 1}
                     </span>
                     <div className="flex items-center gap-2">
-                      <Button size="sm" variant="success" onClick={handleSaveEditSchedule}>
-                        <Check className="h-3.5 w-3.5 mr-1" /> Apply
+                      <Button size="sm" variant="success" disabled={saving} onClick={handleSaveEditSchedule}>
+                        <Check className="h-3.5 w-3.5 mr-1" /> {saving ? "Saving..." : "Apply & Save"}
                       </Button>
                       <Button size="sm" variant="ghost" onClick={handleCancelEditSchedule}>
                         <X className="h-3.5 w-3.5 mr-1" /> Cancel
@@ -784,45 +857,70 @@ export function HackathonDashboardEdit() {
         </div>
 
         {/* Add New Schedule Item */}
-        <div className="mt-6 rounded-xl border border-dashed border-adm-border bg-adm-surface/60 p-4">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-adm-fg flex items-center gap-1.5">
-            <Plus className="h-4 w-4 text-accent" /> Add New Schedule Milestone
-          </h4>
-          <div className="mt-3 grid gap-3 sm:grid-cols-4">
-            <Input
-              value={newScheduleTime}
-              onChange={(e) => setNewScheduleTime(e.target.value)}
-              placeholder="Time (e.g. 02:00 PM)"
-            />
-            <Input
-              className="sm:col-span-2"
-              value={newScheduleTitle}
-              onChange={(e) => setNewScheduleTitle(e.target.value)}
-              placeholder="Milestone Title (e.g. Mentorship Review Round 2)"
-            />
-            <Select
-              value={newScheduleStatus}
-              onChange={(e) =>
-                setNewScheduleStatus(e.target.value as "upcoming" | "live" | "completed")
-              }
-            >
-              <option value="upcoming">Upcoming</option>
-              <option value="live">Live Now</option>
-              <option value="completed">Completed</option>
-            </Select>
+        <form
+          onSubmit={handleAddScheduleItem}
+          className="mt-6 rounded-xl border border-dashed border-adm-border bg-adm-surface/60 p-4"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-adm-fg flex items-center gap-1.5">
+              <Plus className="h-4 w-4 text-accent" /> Add New Schedule Milestone
+            </h4>
+            <span className="text-[11px] text-adm-muted">
+              Auto-saves and publishes live to participant dashboards
+            </span>
           </div>
-          <div className="mt-3 flex gap-3">
-            <Input
-              className="flex-1"
-              value={newScheduleDesc}
-              onChange={(e) => setNewScheduleDesc(e.target.value)}
-              placeholder="Description (optional details, instructions, or deliverables)"
-            />
-            <Button variant="info" size="sm" onClick={handleAddScheduleItem}>
-              <Plus className="h-4 w-4" /> Add Item
-            </Button>
+
+          <div className="grid gap-3 sm:grid-cols-4">
+            <Field label="Time Range">
+              <Input
+                value={newScheduleTime}
+                onChange={(e) => setNewScheduleTime(e.target.value)}
+                placeholder="e.g. 02:00 PM (or leave blank for TBD)"
+              />
+            </Field>
+            <Field label="Milestone Title *" className="sm:col-span-2">
+              <Input
+                value={newScheduleTitle}
+                onChange={(e) => setNewScheduleTitle(e.target.value)}
+                placeholder="e.g. Mentorship Review Round 2"
+                required
+              />
+            </Field>
+            <Field label="Initial Status">
+              <Select
+                value={newScheduleStatus}
+                onChange={(e) =>
+                  setNewScheduleStatus(e.target.value as "upcoming" | "live" | "completed")
+                }
+              >
+                <option value="upcoming">Upcoming</option>
+                <option value="live">Live Now</option>
+                <option value="completed">Completed</option>
+              </Select>
+            </Field>
           </div>
-        </div>
+
+          <div className="mt-3 flex flex-col sm:flex-row gap-3">
+            <Field label="Description / Instructions (Optional)" className="flex-1">
+              <Input
+                value={newScheduleDesc}
+                onChange={(e) => setNewScheduleDesc(e.target.value)}
+                placeholder="Details, guidelines, or what happens during this round..."
+              />
+            </Field>
+            <div className="sm:self-end">
+              <Button
+                type="submit"
+                variant="info"
+                disabled={saving}
+                className="w-full sm:w-auto h-10 px-4"
+              >
+                <Plus className="h-4 w-4" />
+                {saving ? "Adding & Saving..." : "Add & Publish Milestone"}
+              </Button>
+            </div>
+          </div>
+        </form>
       </Card>
 
       {/* Card 4: Resources & Guidelines (With FULL Editing Support) */}
@@ -861,8 +959,8 @@ export function HackathonDashboardEdit() {
                       Editing Resource
                     </span>
                     <div className="flex items-center gap-2">
-                      <Button size="sm" variant="success" onClick={handleSaveEditResource}>
-                        <Check className="h-3.5 w-3.5 mr-1" /> Apply
+                      <Button size="sm" variant="success" disabled={saving} onClick={handleSaveEditResource}>
+                        <Check className="h-3.5 w-3.5 mr-1" /> {saving ? "Saving..." : "Apply & Save"}
                       </Button>
                       <Button size="sm" variant="ghost" onClick={handleCancelEditResource}>
                         <X className="h-3.5 w-3.5 mr-1" /> Cancel
@@ -982,45 +1080,71 @@ export function HackathonDashboardEdit() {
         </div>
 
         {/* Add Resource */}
-        <div className="mt-6 rounded-xl border border-dashed border-adm-border bg-adm-surface/60 p-4">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-adm-fg flex items-center gap-1.5">
-            <Plus className="h-4 w-4 text-accent" /> Add Resource or Guideline Link
-          </h4>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <Input
-              value={newResTitle}
-              onChange={(e) => setNewResTitle(e.target.value)}
-              placeholder="Title (e.g. Problem Statements & Tracks)"
-            />
-            <Input
-              value={newResUrl}
-              onChange={(e) => setNewResUrl(e.target.value)}
-              placeholder="URL (e.g. drive.google.com/... or https://...)"
-            />
-            <Select
-              value={newResType}
-              onChange={(e) =>
-                setNewResType(e.target.value as "link" | "document" | "code" | "community")
-              }
-            >
-              <option value="link">General Link</option>
-              <option value="document">Document / Presentation</option>
-              <option value="code">Code / Repository</option>
-              <option value="community">Community / Group</option>
-            </Select>
+        <form
+          onSubmit={handleAddResource}
+          className="mt-6 rounded-xl border border-dashed border-adm-border bg-adm-surface/60 p-4"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-adm-fg flex items-center gap-1.5">
+              <Plus className="h-4 w-4 text-accent" /> Add Resource or Guideline Link
+            </h4>
+            <span className="text-[11px] text-adm-muted">
+              Auto-saves and publishes live to participant dashboards
+            </span>
           </div>
-          <div className="mt-3 flex gap-3">
-            <Input
-              className="flex-1"
-              value={newResDesc}
-              onChange={(e) => setNewResDesc(e.target.value)}
-              placeholder="Description (optional notes for participants)"
-            />
-            <Button variant="info" size="sm" onClick={handleAddResource}>
-              <Plus className="h-4 w-4" /> Add Resource
-            </Button>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="Resource Title *">
+              <Input
+                value={newResTitle}
+                onChange={(e) => setNewResTitle(e.target.value)}
+                placeholder="e.g. Problem Statements & Tracks"
+                required
+              />
+            </Field>
+            <Field label="URL / Link">
+              <Input
+                value={newResUrl}
+                onChange={(e) => setNewResUrl(e.target.value)}
+                placeholder="e.g. drive.google.com/... or https://..."
+              />
+            </Field>
+            <Field label="Resource Category">
+              <Select
+                value={newResType}
+                onChange={(e) =>
+                  setNewResType(e.target.value as "link" | "document" | "code" | "community")
+                }
+              >
+                <option value="link">General Link</option>
+                <option value="document">Document / Presentation</option>
+                <option value="code">Code / Repository</option>
+                <option value="community">Community / Group</option>
+              </Select>
+            </Field>
           </div>
-        </div>
+
+          <div className="mt-3 flex flex-col sm:flex-row gap-3">
+            <Field label="Description (Optional Notes for Participants)" className="flex-1">
+              <Input
+                value={newResDesc}
+                onChange={(e) => setNewResDesc(e.target.value)}
+                placeholder="Description (optional notes for participants)"
+              />
+            </Field>
+            <div className="sm:self-end">
+              <Button
+                type="submit"
+                variant="info"
+                disabled={saving}
+                className="w-full sm:w-auto h-10 px-4"
+              >
+                <Plus className="h-4 w-4" />
+                {saving ? "Adding & Saving..." : "Add & Publish Resource"}
+              </Button>
+            </div>
+          </div>
+        </form>
       </Card>
 
       {/* Floating Bottom Save Bar */}

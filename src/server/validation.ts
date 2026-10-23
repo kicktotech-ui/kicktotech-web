@@ -122,23 +122,23 @@ export const hackathonScheduleItemSchema = z.object({
   id: z.string().default(() => `sch-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`),
   time: z.union([z.string(), z.null(), z.undefined()]).transform((v) => (v == null ? "" : String(v))),
   title: z.union([z.string(), z.null(), z.undefined()]).transform((v) => (v == null ? "" : String(v))),
-  description: z.union([z.string(), z.null(), z.undefined()]).transform((v) => (v == null ? undefined : String(v).trim() || undefined)),
+  description: z.union([z.string(), z.null(), z.undefined()]).transform((v) => (v == null ? "" : String(v).trim())),
   status: z.union([z.enum(["upcoming", "live", "completed"]), z.string(), z.null(), z.undefined()]).transform((v) => {
     if (v === "live" || v === "completed") return v;
     return "upcoming";
   }),
-});
+}).passthrough();
 
 export const hackathonResourceItemSchema = z.object({
   id: z.string().default(() => `res-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`),
   title: z.union([z.string(), z.null(), z.undefined()]).transform((v) => (v == null ? "" : String(v))),
   url: z.union([z.string(), z.null(), z.undefined()]).transform((v) => (v == null ? "" : String(v))),
-  description: z.union([z.string(), z.null(), z.undefined()]).transform((v) => (v == null ? undefined : String(v).trim() || undefined)),
+  description: z.union([z.string(), z.null(), z.undefined()]).transform((v) => (v == null ? "" : String(v).trim())),
   type: z.union([z.enum(["link", "document", "code", "community"]), z.string(), z.null(), z.undefined()]).transform((v) => {
     if (v === "document" || v === "code" || v === "community") return v;
     return "link";
   }),
-});
+}).passthrough();
 
 export const hackathonDashboardConfigSchema = z.object({
   eventName: z.union([z.string(), z.null(), z.undefined()]).optional(),
@@ -161,6 +161,7 @@ export const hackathonDashboardConfigSchema = z.object({
   contactPhone: z.union([z.string(), z.null(), z.undefined()]).optional(),
   schedule: z.array(hackathonScheduleItemSchema).optional(),
   resources: z.array(hackathonResourceItemSchema).optional(),
-});
+  updatedAt: z.union([z.string(), z.null(), z.undefined()]).optional(),
+}).passthrough();
 
 export type HackathonDashboardConfigInput = z.infer<typeof hackathonDashboardConfigSchema>;

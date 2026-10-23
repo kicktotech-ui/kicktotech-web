@@ -614,11 +614,11 @@ function DashboardContent() {
           </Card>
 
           {/* Participant Resources & Guidelines (From Admin Console) */}
-          {hackathonConfig?.resources && hackathonConfig.resources.length > 0 && (
-            <Card className="p-6">
-              <h3 className="text-lg font-bold flex items-center gap-2 mb-4">
-                <FileText className="h-5 w-5 text-accent" /> Participant Resources & Guidelines
-              </h3>
+          <Card className="p-6">
+            <h3 className="text-lg font-bold flex items-center gap-2 mb-4">
+              <FileText className="h-5 w-5 text-accent" /> Participant Resources & Guidelines
+            </h3>
+            {hackathonConfig?.resources && hackathonConfig.resources.length > 0 ? (
               <div className="grid gap-3 sm:grid-cols-2">
                 {hackathonConfig.resources.map((res) => (
                   <a
@@ -629,11 +629,18 @@ function DashboardContent() {
                     className="flex flex-col justify-between rounded-xl border border-line bg-ink-800/40 p-4 hover:border-accent/40 hover:bg-white/[0.02] transition-colors"
                   >
                     <div>
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <span className="text-sm font-bold text-primary-foreground">
                           {res.title}
                         </span>
-                        <ExternalLink className="h-3.5 w-3.5 text-accent" />
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {res.type && (
+                            <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-accent">
+                              {res.type}
+                            </span>
+                          )}
+                          <ExternalLink className="h-3.5 w-3.5 text-accent" />
+                        </div>
                       </div>
                       {res.description && (
                         <p className="mt-1 text-xs text-muted leading-relaxed">
@@ -644,8 +651,12 @@ function DashboardContent() {
                   </a>
                 ))}
               </div>
-            </Card>
-          )}
+            ) : (
+              <p className="text-sm text-muted">
+                Resources, problem statements, and guidelines will be published shortly.
+              </p>
+            )}
+          </Card>
 
           {/* Coordinator Helpdesk */}
           <div className="rounded-2xl border border-line bg-surface p-5">
