@@ -781,20 +781,8 @@ function DashboardContent() {
         </div>
       )}
 
-      {/* Shared Bottom Resource Links */}
-      <div className="mt-8 grid gap-4 sm:grid-cols-2">
-        <Card className="flex items-center justify-between p-5">
-          <div className="flex items-center gap-3">
-            <FileText className="h-5 w-5 text-accent" />
-            <div>
-              <p className="text-sm font-semibold">Documents & resources</p>
-              <p className="text-xs text-muted">Access syllabus, guides, and templates</p>
-            </div>
-          </div>
-          <Button href="/internship" size="sm" variant="ghost">
-            Open
-          </Button>
-        </Card>
+      {/* Shared Bottom Support Link */}
+      <div className="mt-8">
         <Card className="flex items-center justify-between p-5">
           <div className="flex items-center gap-3">
             <LifeBuoy className="h-5 w-5 text-accent" />
