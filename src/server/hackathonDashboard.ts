@@ -17,7 +17,7 @@ export const DEFAULT_HACKATHON_DASHBOARD_CONFIG: HackathonDashboardConfig = {
   announcement:
     "Welcome participants! Reporting begins sharply at 8:45 AM at JSPM University Library Building. Please bring your valid college ID card, personal laptop, and chargers. Morning refreshments and participant kits are included.",
   announcementActive: true,
-  whatsappGroupUrl: "https://chat.whatsapp.com/",
+  whatsappGroupUrl: "https://chat.whatsapp.com/IJJw79iVdWMDTzZ9f9QcYN",
   discordUrl: "",
   officialPortalUrl:
     "https://hack2skill.com/event/promptwars-x-kicktotech-promptwars-2026?utm_source=hack2skill&utm_medium=homepage",
@@ -94,7 +94,7 @@ export const DEFAULT_HACKATHON_DASHBOARD_CONFIG: HackathonDashboardConfig = {
     {
       id: "res-2",
       title: "Official WhatsApp Participant Community",
-      url: "https://chat.whatsapp.com/",
+      url: "https://chat.whatsapp.com/IJJw79iVdWMDTzZ9f9QcYN",
       description: "Connect with fellow builders, mentors, and the organizing team in real-time.",
       type: "community",
     },
@@ -138,14 +138,25 @@ export async function getHackathonDashboardConfig(): Promise<HackathonDashboardC
       const doc = await db.collection("settings").doc("hackathon_dashboard").get();
       if (doc.exists) {
         const data = doc.data() as Partial<HackathonDashboardConfig>;
+        const whatsappUrl =
+          data.whatsappGroupUrl && data.whatsappGroupUrl !== "https://chat.whatsapp.com/"
+            ? data.whatsappGroupUrl
+            : DEFAULT_HACKATHON_DASHBOARD_CONFIG.whatsappGroupUrl;
+
         const merged: HackathonDashboardConfig = {
           ...DEFAULT_HACKATHON_DASHBOARD_CONFIG,
           ...data,
+          whatsappGroupUrl: whatsappUrl,
           schedule: Array.isArray(data.schedule)
             ? data.schedule
             : DEFAULT_HACKATHON_DASHBOARD_CONFIG.schedule,
           resources: Array.isArray(data.resources)
-            ? data.resources
+            ? data.resources.map((r) =>
+                r.title?.toLowerCase().includes("whatsapp") &&
+                (!r.url || r.url === "https://chat.whatsapp.com/" || r.url === "#")
+                  ? { ...r, url: whatsappUrl || DEFAULT_HACKATHON_DASHBOARD_CONFIG.whatsappGroupUrl! }
+                  : r,
+              )
             : DEFAULT_HACKATHON_DASHBOARD_CONFIG.resources,
         };
         globalMemoryRef.__kttHackathonDashboardConfig = merged;
