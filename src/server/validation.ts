@@ -119,40 +119,46 @@ export type IssueCertificateInput = z.infer<typeof issueCertificateSchema>;
 export type RevokeCertificateInput = z.infer<typeof revokeCertificateSchema>;
 
 export const hackathonScheduleItemSchema = z.object({
-  id: z.string(),
-  time: z.string(),
-  title: z.string(),
-  description: z.string().optional(),
-  status: z.enum(["upcoming", "live", "completed"]).optional(),
+  id: z.string().default(() => `sch-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`),
+  time: z.union([z.string(), z.null(), z.undefined()]).transform((v) => (v == null ? "" : String(v))),
+  title: z.union([z.string(), z.null(), z.undefined()]).transform((v) => (v == null ? "" : String(v))),
+  description: z.union([z.string(), z.null(), z.undefined()]).transform((v) => (v == null ? undefined : String(v).trim() || undefined)),
+  status: z.union([z.enum(["upcoming", "live", "completed"]), z.string(), z.null(), z.undefined()]).transform((v) => {
+    if (v === "live" || v === "completed") return v;
+    return "upcoming";
+  }),
 });
 
 export const hackathonResourceItemSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  url: z.string(),
-  description: z.string().optional(),
-  type: z.enum(["link", "document", "code", "community"]).optional(),
+  id: z.string().default(() => `res-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`),
+  title: z.union([z.string(), z.null(), z.undefined()]).transform((v) => (v == null ? "" : String(v))),
+  url: z.union([z.string(), z.null(), z.undefined()]).transform((v) => (v == null ? "" : String(v))),
+  description: z.union([z.string(), z.null(), z.undefined()]).transform((v) => (v == null ? undefined : String(v).trim() || undefined)),
+  type: z.union([z.enum(["link", "document", "code", "community"]), z.string(), z.null(), z.undefined()]).transform((v) => {
+    if (v === "document" || v === "code" || v === "community") return v;
+    return "link";
+  }),
 });
 
 export const hackathonDashboardConfigSchema = z.object({
-  eventName: z.string().optional(),
-  tagline: z.string().optional(),
-  description: z.string().optional(),
-  date: z.string().optional(),
-  time: z.string().optional(),
-  reportingTime: z.string().optional(),
-  venue: z.string().optional(),
-  mode: z.string().optional(),
-  theme: z.string().optional(),
-  prizePool: z.string().optional(),
-  announcement: z.string().optional(),
-  announcementActive: z.boolean().optional(),
-  whatsappGroupUrl: z.string().optional(),
-  discordUrl: z.string().optional(),
-  officialPortalUrl: z.string().optional(),
-  submissionUrl: z.string().optional(),
-  contactEmail: z.string().optional(),
-  contactPhone: z.string().optional(),
+  eventName: z.union([z.string(), z.null(), z.undefined()]).optional(),
+  tagline: z.union([z.string(), z.null(), z.undefined()]).optional(),
+  description: z.union([z.string(), z.null(), z.undefined()]).optional(),
+  date: z.union([z.string(), z.null(), z.undefined()]).optional(),
+  time: z.union([z.string(), z.null(), z.undefined()]).optional(),
+  reportingTime: z.union([z.string(), z.null(), z.undefined()]).optional(),
+  venue: z.union([z.string(), z.null(), z.undefined()]).optional(),
+  mode: z.union([z.string(), z.null(), z.undefined()]).optional(),
+  theme: z.union([z.string(), z.null(), z.undefined()]).optional(),
+  prizePool: z.union([z.string(), z.null(), z.undefined()]).optional(),
+  announcement: z.union([z.string(), z.null(), z.undefined()]).optional(),
+  announcementActive: z.union([z.boolean(), z.null(), z.undefined()]).optional(),
+  whatsappGroupUrl: z.union([z.string(), z.null(), z.undefined()]).optional(),
+  discordUrl: z.union([z.string(), z.null(), z.undefined()]).optional(),
+  officialPortalUrl: z.union([z.string(), z.null(), z.undefined()]).optional(),
+  submissionUrl: z.union([z.string(), z.null(), z.undefined()]).optional(),
+  contactEmail: z.union([z.string(), z.null(), z.undefined()]).optional(),
+  contactPhone: z.union([z.string(), z.null(), z.undefined()]).optional(),
   schedule: z.array(hackathonScheduleItemSchema).optional(),
   resources: z.array(hackathonResourceItemSchema).optional(),
 });

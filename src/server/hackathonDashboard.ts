@@ -161,38 +161,75 @@ export async function getHackathonDashboardConfig(): Promise<HackathonDashboardC
   return fallback;
 }
 
+export type HackathonDashboardConfigPatch = {
+  [K in keyof HackathonDashboardConfig]?: unknown;
+};
+
 /**
  * Update the Hackathon Dashboard configuration.
  * Persists to Firestore and in-memory cache, and appends an audit record.
  */
 export async function saveHackathonDashboardConfig(
-  patch: Partial<HackathonDashboardConfig>,
+  patch: HackathonDashboardConfigPatch,
   meta?: { actor?: string; requestId?: string },
 ): Promise<HackathonDashboardConfig> {
   const current = await getHackathonDashboardConfig();
+
+  const safeStr = (v: unknown, fallback: string): string => {
+    if (typeof v === "string") return v.trim();
+    if (v == null) return fallback;
+    return String(v).trim();
+  };
+
+  const safeOptStr = (v: unknown, fallback?: string): string | undefined => {
+    if (v === null || v === "") return undefined;
+    if (typeof v === "string") return v.trim() || undefined;
+    return fallback;
+  };
+
+  const sanitizedSchedule: HackathonScheduleItem[] = Array.isArray(patch.schedule)
+    ? patch.schedule.map((item, index) => ({
+        id: item.id || `sch-${Date.now()}-${index}`,
+        time: safeStr(item.time, "TBD"),
+        title: safeStr(item.title, "Schedule Item"),
+        description: safeOptStr(item.description),
+        status: (item.status === "live" || item.status === "completed" ? item.status : "upcoming") as "upcoming" | "live" | "completed",
+      }))
+    : current.schedule;
+
+  const sanitizedResources: HackathonResourceItem[] = Array.isArray(patch.resources)
+    ? patch.resources.map((item, index) => ({
+        id: item.id || `res-${Date.now()}-${index}`,
+        title: safeStr(item.title, "Resource"),
+        url: safeStr(item.url, "#"),
+        description: safeOptStr(item.description),
+        type: (item.type === "document" || item.type === "code" || item.type === "community" ? item.type : "link") as "link" | "document" | "code" | "community",
+      }))
+    : current.resources;
+
   const updated: HackathonDashboardConfig = {
     ...current,
     ...patch,
-    eventName: (patch.eventName ?? current.eventName).trim(),
-    tagline: (patch.tagline ?? current.tagline).trim(),
-    description: (patch.description ?? current.description).trim(),
-    date: (patch.date ?? current.date).trim(),
-    time: (patch.time ?? current.time).trim(),
-    reportingTime: (patch.reportingTime ?? current.reportingTime).trim(),
-    venue: (patch.venue ?? current.venue).trim(),
-    mode: (patch.mode ?? current.mode).trim(),
-    theme: (patch.theme ?? current.theme).trim(),
-    prizePool: (patch.prizePool ?? current.prizePool).trim(),
-    announcement: patch.announcement !== undefined ? patch.announcement.trim() : current.announcement,
-    announcementActive: patch.announcementActive !== undefined ? patch.announcementActive : current.announcementActive,
-    whatsappGroupUrl: patch.whatsappGroupUrl !== undefined ? patch.whatsappGroupUrl.trim() : current.whatsappGroupUrl,
-    discordUrl: patch.discordUrl !== undefined ? patch.discordUrl.trim() : current.discordUrl,
-    officialPortalUrl: patch.officialPortalUrl !== undefined ? patch.officialPortalUrl.trim() : current.officialPortalUrl,
-    submissionUrl: patch.submissionUrl !== undefined ? patch.submissionUrl.trim() : current.submissionUrl,
-    contactEmail: patch.contactEmail !== undefined ? patch.contactEmail.trim() : current.contactEmail,
-    contactPhone: patch.contactPhone !== undefined ? patch.contactPhone.trim() : current.contactPhone,
-    schedule: Array.isArray(patch.schedule) ? patch.schedule : current.schedule,
-    resources: Array.isArray(patch.resources) ? patch.resources : current.resources,
+    eventName: safeStr(patch.eventName, current.eventName),
+    tagline: safeStr(patch.tagline, current.tagline),
+    description: safeStr(patch.description, current.description),
+    date: safeStr(patch.date, current.date),
+    time: safeStr(patch.time, current.time),
+    reportingTime: safeStr(patch.reportingTime, current.reportingTime),
+    venue: safeStr(patch.venue, current.venue),
+    mode: safeStr(patch.mode, current.mode),
+    theme: safeStr(patch.theme, current.theme),
+    prizePool: safeStr(patch.prizePool, current.prizePool),
+    announcement: safeOptStr(patch.announcement, current.announcement),
+    announcementActive: patch.announcementActive !== undefined ? Boolean(patch.announcementActive) : current.announcementActive,
+    whatsappGroupUrl: safeOptStr(patch.whatsappGroupUrl, current.whatsappGroupUrl),
+    discordUrl: safeOptStr(patch.discordUrl, current.discordUrl),
+    officialPortalUrl: safeOptStr(patch.officialPortalUrl, current.officialPortalUrl),
+    submissionUrl: safeOptStr(patch.submissionUrl, current.submissionUrl),
+    contactEmail: safeOptStr(patch.contactEmail, current.contactEmail),
+    contactPhone: safeOptStr(patch.contactPhone, current.contactPhone),
+    schedule: sanitizedSchedule,
+    resources: sanitizedResources,
     updatedAt: new Date().toISOString(),
   };
 

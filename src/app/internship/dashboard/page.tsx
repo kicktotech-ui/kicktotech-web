@@ -198,120 +198,117 @@ function DashboardContent() {
         }
       />
 
-      {/* Cohort Summary Strips (Shows at-a-glance status for both) */}
-      <div className="mb-6 grid gap-4 sm:grid-cols-2">
+      {/* Cohort Section Switcher Cards (Interactive & Responsive) */}
+      <div className="mb-8 grid gap-4 sm:gap-6 md:grid-cols-2">
         {/* Hackathon Participation Card */}
-        <div
-          onClick={() => setActiveTab("hackathon")}
-          className={cn(
-            "cursor-pointer rounded-2xl border p-4.5 transition-all",
-            activeTab === "hackathon"
-              ? "border-accent/50 bg-accent/10 shadow-[0_0_20px_rgba(34,227,214,0.15)] ring-1 ring-accent/40"
-              : "border-line bg-surface hover:border-accent/30 hover:bg-white/[0.03]",
-          )}
-        >
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-accent">
-              <Trophy className="h-4 w-4" /> Hackathon Participation
-            </span>
-            {hackathonEnrolled ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2.5 py-0.5 text-xs font-bold text-emerald-300">
-                <CheckCircle2 className="h-3 w-3" />
-                {hackathonReg?.kttId ? `Enrolled • ${hackathonReg.kttId}` : "Enrolled"}
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 rounded-full border border-line bg-ink-800 px-2.5 py-0.5 text-[11px] text-muted">
-                Not Enrolled
-              </span>
-            )}
-          </div>
-          <div className="mt-2.5">
-            <p className="text-base font-bold text-primary-foreground">
-              {hackathonConfig?.eventName || "PromptWars × KICK To TECH"}
-            </p>
-            <p className="mt-0.5 text-xs text-muted">
-              {hackathonEnrolled
-                ? `Status: ${hackathonReg?.status === "PAYMENT_VERIFIED" || hackathonReg?.status === "CERTIFICATE_ISSUED" ? "Verified & Paid" : "Payment Pending"} • 28 Oct 2026`
-                : "Build with AI • ₹30,000 Prize Pool • ₹99 Kit Fee"}
-            </p>
-          </div>
-        </div>
-
-        {/* Internship Participation Card */}
-        <div
-          onClick={() => setActiveTab("internship")}
-          className={cn(
-            "cursor-pointer rounded-2xl border p-4.5 transition-all",
-            activeTab === "internship"
-              ? "border-accent/50 bg-accent/10 shadow-[0_0_20px_rgba(34,227,214,0.15)] ring-1 ring-accent/40"
-              : "border-line bg-surface hover:border-accent/30 hover:bg-white/[0.03]",
-          )}
-        >
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted">
-              <BookOpen className="h-4 w-4 text-accent" /> Internship Participation
-            </span>
-            {internshipEnrolled ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2.5 py-0.5 text-xs font-bold text-emerald-300">
-                <CheckCircle2 className="h-3 w-3" /> Enrolled
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 rounded-full border border-line bg-ink-800 px-2.5 py-0.5 text-[11px] text-muted">
-                Not Enrolled
-              </span>
-            )}
-          </div>
-          <div className="mt-2.5">
-            <p className="text-base font-bold text-primary-foreground">
-              5-Week Project-First Internship
-            </p>
-            <p className="mt-0.5 text-xs text-muted">
-              {internshipEnrolled
-                ? "Active Track • Real-world projects & Industry Mentorship"
-                : "Choose a domain: Python (AI), Web Dev, Data Analytics..."}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Primary Section Switcher Tabs */}
-      <div className="mb-8 flex gap-2 border-b border-line pb-4">
         <button
           type="button"
           onClick={() => setActiveTab("hackathon")}
           className={cn(
-            "flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all",
+            "group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-5 sm:p-6 text-left transition-all",
             activeTab === "hackathon"
-              ? "bg-accent text-accent-foreground shadow-md shadow-accent/20"
-              : "border border-line bg-surface text-muted hover:bg-white/5 hover:text-primary-foreground",
+              ? "border-accent bg-accent/[0.08] shadow-[0_0_24px_rgba(34,227,214,0.14)] ring-1 ring-accent"
+              : "border-line bg-ink-800/60 hover:border-accent/40 hover:bg-ink-800/90",
           )}
         >
-          <Trophy className="h-4 w-4" />
-          Hackathon Participation
-          {hackathonEnrolled && (
-            <span className="ml-1 rounded-full bg-black/20 px-2 py-0.5 text-[10px] font-bold">
-              Active
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-accent">
+                <Trophy className="h-4 w-4" /> Hackathon Participation
+              </span>
+              {hackathonEnrolled ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2.5 py-0.5 text-xs font-bold text-emerald-300">
+                  <CheckCircle2 className="h-3 w-3" />
+                  {hackathonReg?.kttId ? `Enrolled • ${hackathonReg.kttId}` : "Enrolled"}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full border border-line bg-ink-900 px-2.5 py-0.5 text-[11px] text-muted">
+                  Not Enrolled
+                </span>
+              )}
+            </div>
+
+            <div className="mt-3">
+              <p className="text-lg font-bold text-primary-foreground group-hover:text-accent transition-colors">
+                {hackathonConfig?.eventName || "PromptWars × KICK To TECH"}
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                {hackathonEnrolled
+                  ? `Status: ${hackathonReg?.status === "PAYMENT_VERIFIED" || hackathonReg?.status === "CERTIFICATE_ISSUED" ? "Verified & Paid" : "Payment Pending"} • 28 Oct 2026`
+                  : "Build with AI • ₹30,000 Prize Pool • ₹99 Kit Fee"}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center justify-between border-t border-line/50 pt-3">
+            <span className="text-[11px] font-medium text-muted">
+              {activeTab === "hackathon" ? "Currently viewing section" : "Click to view hackathon section"}
             </span>
-          )}
+            {activeTab === "hackathon" ? (
+              <span className="rounded-full bg-accent px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-ink-900">
+                Active View
+              </span>
+            ) : (
+              <span className="text-xs font-semibold text-accent group-hover:translate-x-0.5 transition-transform inline-flex items-center gap-1">
+                View <ArrowRight className="h-3 w-3" />
+              </span>
+            )}
+          </div>
         </button>
 
+        {/* Internship Participation Card */}
         <button
           type="button"
           onClick={() => setActiveTab("internship")}
           className={cn(
-            "flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all",
+            "group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-5 sm:p-6 text-left transition-all",
             activeTab === "internship"
-              ? "bg-accent text-accent-foreground shadow-md shadow-accent/20"
-              : "border border-line bg-surface text-muted hover:bg-white/5 hover:text-primary-foreground",
+              ? "border-accent bg-accent/[0.08] shadow-[0_0_24px_rgba(34,227,214,0.14)] ring-1 ring-accent"
+              : "border-line bg-ink-800/60 hover:border-accent/40 hover:bg-ink-800/90",
           )}
         >
-          <BookOpen className="h-4 w-4" />
-          Internship Participation
-          {internshipEnrolled && (
-            <span className="ml-1 rounded-full bg-black/20 px-2 py-0.5 text-[10px] font-bold">
-              Active
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted">
+                <BookOpen className="h-4 w-4 text-accent" /> Internship Participation
+              </span>
+              {internshipEnrolled ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2.5 py-0.5 text-xs font-bold text-emerald-300">
+                  <CheckCircle2 className="h-3 w-3" /> Enrolled
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full border border-line bg-ink-900 px-2.5 py-0.5 text-[11px] text-muted">
+                  Not Enrolled
+                </span>
+              )}
+            </div>
+
+            <div className="mt-3">
+              <p className="text-lg font-bold text-primary-foreground group-hover:text-accent transition-colors">
+                5-Week Project-First Internship
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                {internshipEnrolled
+                  ? "Active Track • Real-world projects & Industry Mentorship"
+                  : "Choose a domain: Python (AI), Web Dev, Data Analytics..."}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center justify-between border-t border-line/50 pt-3">
+            <span className="text-[11px] font-medium text-muted">
+              {activeTab === "internship" ? "Currently viewing section" : "Click to view internship section"}
             </span>
-          )}
+            {activeTab === "internship" ? (
+              <span className="rounded-full bg-accent px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-ink-900">
+                Active View
+              </span>
+            ) : (
+              <span className="text-xs font-semibold text-accent group-hover:translate-x-0.5 transition-transform inline-flex items-center gap-1">
+                View <ArrowRight className="h-3 w-3" />
+              </span>
+            )}
+          </div>
         </button>
       </div>
 
@@ -439,7 +436,7 @@ function DashboardContent() {
 
           {/* Live Announcement Banner (From Admin Console) */}
           {hackathonConfig?.announcementActive && hackathonConfig.announcement && (
-            <div className="flex items-start gap-3 rounded-2xl border border-accent/40 bg-accent/10 p-4.5 text-sm sm:p-5">
+            <div className="flex items-start gap-3 rounded-2xl border border-accent/40 bg-accent/10 p-4 sm:p-5 text-sm">
               <Megaphone className="h-5 w-5 flex-shrink-0 text-accent mt-0.5" />
               <div className="space-y-1">
                 <p className="font-bold text-accent">Important Announcement from Organizing Team</p>
@@ -452,7 +449,7 @@ function DashboardContent() {
 
           {/* Event Details Grid (Dynamic from Admin Console) */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Card className="p-4.5">
+            <Card className="p-5">
               <div className="flex items-center justify-between text-muted">
                 <span className="text-xs font-semibold uppercase tracking-wider">Date & Time</span>
                 <Clock className="h-4 w-4 text-accent" />
@@ -465,7 +462,7 @@ function DashboardContent() {
               </p>
             </Card>
 
-            <Card className="p-4.5">
+            <Card className="p-5">
               <div className="flex items-center justify-between text-muted">
                 <span className="text-xs font-semibold uppercase tracking-wider">Venue / Mode</span>
                 <MapPin className="h-4 w-4 text-accent" />
@@ -478,7 +475,7 @@ function DashboardContent() {
               </p>
             </Card>
 
-            <Card className="p-4.5">
+            <Card className="p-5">
               <div className="flex items-center justify-between text-muted">
                 <span className="text-xs font-semibold uppercase tracking-wider">Theme</span>
                 <Sparkles className="h-4 w-4 text-accent" />
@@ -489,7 +486,7 @@ function DashboardContent() {
               <p className="text-xs text-muted mt-0.5">Prompt Engineering & GenAI</p>
             </Card>
 
-            <Card className="p-4.5">
+            <Card className="p-5">
               <div className="flex items-center justify-between text-muted">
                 <span className="text-xs font-semibold uppercase tracking-wider">Prize Pool</span>
                 <Trophy className="h-4 w-4 text-accent" />
@@ -745,7 +742,7 @@ function DashboardContent() {
 
       {/* Shared Bottom Resource Links */}
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
-        <Card className="flex items-center justify-between p-4.5">
+        <Card className="flex items-center justify-between p-5">
           <div className="flex items-center gap-3">
             <FileText className="h-5 w-5 text-accent" />
             <div>
@@ -757,7 +754,7 @@ function DashboardContent() {
             Open
           </Button>
         </Card>
-        <Card className="flex items-center justify-between p-4.5">
+        <Card className="flex items-center justify-between p-5">
           <div className="flex items-center gap-3">
             <LifeBuoy className="h-5 w-5 text-accent" />
             <div>
