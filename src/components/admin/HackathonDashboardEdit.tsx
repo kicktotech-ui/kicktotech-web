@@ -280,6 +280,13 @@ export function HackathonDashboardEdit() {
       url = `https://${url}`;
     }
 
+    if (
+      (editingResItem.id === "res-2" || title.toLowerCase().includes("whatsapp") || url.includes("chat.whatsapp.com")) &&
+      (url === "https://chat.whatsapp.com" || url === "https://chat.whatsapp.com/" || !url.includes("chat.whatsapp.com/"))
+    ) {
+      url = "https://chat.whatsapp.com/IJJw79iVdWMDTzZ9f9QcYN";
+    }
+
     const desc = editingResItem.description?.trim() || undefined;
 
     const updatedResources = config.resources.map((item) =>
@@ -333,6 +340,13 @@ export function HackathonDashboardEdit() {
 
     if (!url) {
       url = "#";
+    }
+
+    if (
+      (title.toLowerCase().includes("whatsapp") || url.includes("chat.whatsapp.com")) &&
+      (url === "https://chat.whatsapp.com" || url === "https://chat.whatsapp.com/" || !url.includes("chat.whatsapp.com/"))
+    ) {
+      url = "https://chat.whatsapp.com/IJJw79iVdWMDTzZ9f9QcYN";
     }
 
     const desc = newResDesc.trim() || undefined;

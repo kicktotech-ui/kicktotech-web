@@ -2,6 +2,8 @@ import { getAdminDb, isAdminConfigured } from "./firebase/admin";
 import { writeAudit } from "./audit";
 import type { HackathonDashboardConfig, HackathonScheduleItem, HackathonResourceItem } from "@/types";
 
+export const OFFICIAL_WHATSAPP_COMMUNITY_URL = "https://chat.whatsapp.com/IJJw79iVdWMDTzZ9f9QcYN";
+
 export const DEFAULT_HACKATHON_DASHBOARD_CONFIG: HackathonDashboardConfig = {
   eventName: "PromptWars × KICK To TECH",
   tagline: "Where ideas meet AI • Imagine, Innovate, Impact",
@@ -17,7 +19,7 @@ export const DEFAULT_HACKATHON_DASHBOARD_CONFIG: HackathonDashboardConfig = {
   announcement:
     "Welcome participants! Reporting begins sharply at 8:45 AM at JSPM University Library Building. Please bring your valid college ID card, personal laptop, and chargers. Morning refreshments and participant kits are included.",
   announcementActive: true,
-  whatsappGroupUrl: "https://chat.whatsapp.com/IJJw79iVdWMDTzZ9f9QcYN",
+  whatsappGroupUrl: OFFICIAL_WHATSAPP_COMMUNITY_URL,
   discordUrl: "",
   officialPortalUrl:
     "https://hack2skill.com/event/promptwars-x-kicktotech-promptwars-2026?utm_source=hack2skill&utm_medium=homepage",
@@ -125,10 +127,48 @@ const globalMemoryRef = globalThis as unknown as {
  * otherwise returns in-memory cached copy or default template.
  */
 export async function getHackathonDashboardConfig(): Promise<HackathonDashboardConfig> {
+  const normalizeConfig = (cfg: HackathonDashboardConfig): HackathonDashboardConfig => {
+    const isPlaceholder = (u?: string) =>
+      !u ||
+      u === "#" ||
+      u === "https://chat.whatsapp.com/" ||
+      u === "https://chat.whatsapp.com" ||
+      !u.includes("IJJw79iVdWMDTzZ9f9QcYN");
+
+    const whatsappGroupUrl = isPlaceholder(cfg.whatsappGroupUrl)
+      ? OFFICIAL_WHATSAPP_COMMUNITY_URL
+      : cfg.whatsappGroupUrl;
+
+    const resources = (cfg.resources || []).map((r) => {
+      const isWhatsApp =
+        r.id === "res-2" ||
+        r.title?.toLowerCase().includes("whatsapp") ||
+        (typeof r.url === "string" && r.url.includes("chat.whatsapp.com"));
+
+      if (isWhatsApp && isPlaceholder(r.url)) {
+        return {
+          ...r,
+          title:
+            r.title && !r.title.toLowerCase().includes("whatsapp")
+              ? r.title
+              : "Official WhatsApp Participant Community",
+          url: OFFICIAL_WHATSAPP_COMMUNITY_URL,
+        };
+      }
+      return r;
+    });
+
+    return {
+      ...cfg,
+      whatsappGroupUrl,
+      resources,
+    };
+  };
+
   if (globalMemoryRef.__kttHackathonDashboardConfig) {
     // Check if Firestore has a newer copy when configured
     if (!isAdminConfigured()) {
-      return globalMemoryRef.__kttHackathonDashboardConfig;
+      return normalizeConfig(globalMemoryRef.__kttHackathonDashboardConfig);
     }
   }
 
@@ -138,10 +178,41 @@ export async function getHackathonDashboardConfig(): Promise<HackathonDashboardC
       const doc = await db.collection("settings").doc("hackathon_dashboard").get();
       if (doc.exists) {
         const data = doc.data() as Partial<HackathonDashboardConfig>;
+        const rawWhatsapp = data.whatsappGroupUrl;
         const whatsappUrl =
-          data.whatsappGroupUrl && data.whatsappGroupUrl !== "https://chat.whatsapp.com/"
-            ? data.whatsappGroupUrl
-            : DEFAULT_HACKATHON_DASHBOARD_CONFIG.whatsappGroupUrl;
+          rawWhatsapp &&
+          rawWhatsapp !== "https://chat.whatsapp.com/" &&
+          rawWhatsapp !== "https://chat.whatsapp.com" &&
+          rawWhatsapp.includes("chat.whatsapp.com/")
+            ? rawWhatsapp
+            : OFFICIAL_WHATSAPP_COMMUNITY_URL;
+
+        const rawResources = Array.isArray(data.resources)
+          ? data.resources
+          : DEFAULT_HACKATHON_DASHBOARD_CONFIG.resources;
+
+        const normalizedResources = rawResources.map((r) => {
+          const isWhatsApp =
+            r.id === "res-2" ||
+            r.title?.toLowerCase().includes("whatsapp") ||
+            (typeof r.url === "string" && r.url.includes("chat.whatsapp.com"));
+
+          if (isWhatsApp) {
+            const hasProperCode =
+              typeof r.url === "string" && r.url.includes("IJJw79iVdWMDTzZ9f9QcYN");
+            if (!hasProperCode) {
+              return {
+                ...r,
+                title:
+                  r.title && !r.title.toLowerCase().includes("whatsapp")
+                    ? r.title
+                    : "Official WhatsApp Participant Community",
+                url: OFFICIAL_WHATSAPP_COMMUNITY_URL,
+              };
+            }
+          }
+          return r;
+        });
 
         const merged: HackathonDashboardConfig = {
           ...DEFAULT_HACKATHON_DASHBOARD_CONFIG,
@@ -150,15 +221,36 @@ export async function getHackathonDashboardConfig(): Promise<HackathonDashboardC
           schedule: Array.isArray(data.schedule)
             ? data.schedule
             : DEFAULT_HACKATHON_DASHBOARD_CONFIG.schedule,
-          resources: Array.isArray(data.resources)
-            ? data.resources.map((r) =>
-                r.title?.toLowerCase().includes("whatsapp") &&
-                (!r.url || r.url === "https://chat.whatsapp.com/" || r.url === "#")
-                  ? { ...r, url: whatsappUrl || DEFAULT_HACKATHON_DASHBOARD_CONFIG.whatsappGroupUrl! }
-                  : r,
-              )
-            : DEFAULT_HACKATHON_DASHBOARD_CONFIG.resources,
+          resources: normalizedResources,
         };
+
+        const hadLegacyPlaceholder =
+          data.whatsappGroupUrl === "https://chat.whatsapp.com/" ||
+          data.whatsappGroupUrl === "https://chat.whatsapp.com" ||
+          !data.whatsappGroupUrl ||
+          rawResources.some(
+            (r) =>
+              (r.id === "res-2" ||
+                r.title?.toLowerCase().includes("whatsapp") ||
+                (typeof r.url === "string" && r.url.includes("chat.whatsapp.com"))) &&
+              (!r.url ||
+                r.url === "https://chat.whatsapp.com/" ||
+                r.url === "https://chat.whatsapp.com" ||
+                !r.url.includes("IJJw79iVdWMDTzZ9f9QcYN")),
+          );
+
+        if (hadLegacyPlaceholder) {
+          db.collection("settings")
+            .doc("hackathon_dashboard")
+            .set(merged, { merge: true })
+            .catch((err) =>
+              console.warn(
+                "[hackathonDashboard] Auto-migration of WhatsApp community link to Firestore failed:",
+                err,
+              ),
+            );
+        }
+
         globalMemoryRef.__kttHackathonDashboardConfig = merged;
         return merged;
       }
@@ -167,7 +259,9 @@ export async function getHackathonDashboardConfig(): Promise<HackathonDashboardC
     }
   }
 
-  const fallback = globalMemoryRef.__kttHackathonDashboardConfig ?? { ...DEFAULT_HACKATHON_DASHBOARD_CONFIG };
+  const fallback = normalizeConfig(
+    globalMemoryRef.__kttHackathonDashboardConfig ?? { ...DEFAULT_HACKATHON_DASHBOARD_CONFIG },
+  );
   globalMemoryRef.__kttHackathonDashboardConfig = fallback;
   return fallback;
 }
@@ -202,14 +296,47 @@ export async function saveHackathonDashboardConfig(
       }))
     : current.schedule;
 
+  let finalWhatsapp = safeStr(patch.whatsappGroupUrl ?? current.whatsappGroupUrl, "");
+  if (
+    !finalWhatsapp ||
+    finalWhatsapp === "https://chat.whatsapp.com/" ||
+    finalWhatsapp === "https://chat.whatsapp.com" ||
+    !finalWhatsapp.includes("chat.whatsapp.com/")
+  ) {
+    finalWhatsapp = OFFICIAL_WHATSAPP_COMMUNITY_URL;
+  }
+
   const sanitizedResources: HackathonResourceItem[] = Array.isArray(patch.resources)
-    ? patch.resources.map((item: any, index: number) => ({
-        id: item?.id ? String(item.id) : `res-${Date.now()}-${index}`,
-        title: safeStr(item?.title, "Resource"),
-        url: safeStr(item?.url, "#"),
-        description: item?.description ? String(item.description).trim() : "",
-        type: (item?.type === "document" || item?.type === "code" || item?.type === "community" ? item.type : "link") as "link" | "document" | "code" | "community",
-      }))
+    ? patch.resources.map((item: any, index: number) => {
+        let url = safeStr(item?.url, "#");
+        let title = safeStr(item?.title, "Resource");
+        const isWhatsApp =
+          item?.id === "res-2" ||
+          title.toLowerCase().includes("whatsapp") ||
+          url.includes("chat.whatsapp.com");
+
+        if (
+          isWhatsApp &&
+          (!url ||
+            url === "#" ||
+            url === "https://chat.whatsapp.com/" ||
+            url === "https://chat.whatsapp.com" ||
+            !url.includes("IJJw79iVdWMDTzZ9f9QcYN"))
+        ) {
+          url = OFFICIAL_WHATSAPP_COMMUNITY_URL;
+          if (title.toLowerCase().includes("whatsapp") || item?.id === "res-2") {
+            title = "Official WhatsApp Participant Community";
+          }
+        }
+
+        return {
+          id: item?.id ? String(item.id) : `res-${Date.now()}-${index}`,
+          title,
+          url,
+          description: item?.description ? String(item.description).trim() : "",
+          type: (item?.type === "document" || item?.type === "code" || item?.type === "community" ? item.type : "link") as "link" | "document" | "code" | "community",
+        };
+      })
     : current.resources;
 
   const updated: HackathonDashboardConfig = {
@@ -225,7 +352,7 @@ export async function saveHackathonDashboardConfig(
     prizePool: safeStr(patch.prizePool, current.prizePool),
     announcement: safeStr(patch.announcement ?? current.announcement, ""),
     announcementActive: patch.announcementActive !== undefined ? Boolean(patch.announcementActive) : (current.announcementActive ?? true),
-    whatsappGroupUrl: safeStr(patch.whatsappGroupUrl ?? current.whatsappGroupUrl, ""),
+    whatsappGroupUrl: finalWhatsapp,
     discordUrl: safeStr(patch.discordUrl ?? current.discordUrl, ""),
     officialPortalUrl: safeStr(patch.officialPortalUrl ?? current.officialPortalUrl, ""),
     submissionUrl: safeStr(patch.submissionUrl ?? current.submissionUrl, ""),

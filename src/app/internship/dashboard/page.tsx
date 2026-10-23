@@ -533,7 +533,14 @@ function DashboardContent() {
 
             {hackathonConfig?.whatsappGroupUrl && (
               <a
-                href={hackathonConfig.whatsappGroupUrl}
+                href={
+                  !hackathonConfig.whatsappGroupUrl ||
+                  hackathonConfig.whatsappGroupUrl === "https://chat.whatsapp.com/" ||
+                  hackathonConfig.whatsappGroupUrl === "https://chat.whatsapp.com" ||
+                  !hackathonConfig.whatsappGroupUrl.includes("chat.whatsapp.com/")
+                    ? "https://chat.whatsapp.com/IJJw79iVdWMDTzZ9f9QcYN"
+                    : hackathonConfig.whatsappGroupUrl
+                }
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group flex items-center justify-between rounded-2xl border border-line bg-surface p-4 text-sm font-semibold hover:border-accent/40 hover:bg-white/[0.03] transition-colors"
@@ -621,42 +628,58 @@ function DashboardContent() {
             </h3>
             {hackathonConfig?.resources && hackathonConfig.resources.length > 0 ? (
               <div className="grid gap-3 sm:grid-cols-2">
-                {hackathonConfig.resources.map((res) => (
-                  <a
-                    key={res.id}
-                    href={res.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex flex-col justify-between rounded-xl border border-line bg-ink-800/40 p-4 hover:border-accent/40 hover:bg-white/[0.02] transition-colors"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-bold text-primary-foreground">
-                          {res.title}
-                        </span>
-                        <div className="flex items-center gap-1.5 flex-shrink-0">
-                          {res.type && (
-                            <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-accent">
-                              {res.type}
-                            </span>
-                          )}
-                          <ExternalLink className="h-3.5 w-3.5 text-accent" />
+                {hackathonConfig.resources.map((res) => {
+                  const isWhatsApp =
+                    res.id === "res-2" ||
+                    res.title?.toLowerCase().includes("whatsapp") ||
+                    (typeof res.url === "string" && res.url.includes("chat.whatsapp.com"));
+                  const effectiveUrl =
+                    isWhatsApp &&
+                    (!res.url ||
+                      res.url === "#" ||
+                      res.url === "https://chat.whatsapp.com/" ||
+                      res.url === "https://chat.whatsapp.com" ||
+                      !res.url.includes("IJJw79iVdWMDTzZ9f9QcYN"))
+                      ? "https://chat.whatsapp.com/IJJw79iVdWMDTzZ9f9QcYN"
+                      : res.url;
+
+                  return (
+                    <a
+                      key={res.id}
+                      href={effectiveUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex flex-col justify-between rounded-xl border border-line bg-ink-800/40 p-4 hover:border-accent/40 hover:bg-white/[0.02] transition-colors"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-bold text-primary-foreground">
+                            {res.title}
+                          </span>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {res.type && (
+                              <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-accent">
+                                {res.type}
+                              </span>
+                            )}
+                            <ExternalLink className="h-3.5 w-3.5 text-accent" />
+                          </div>
                         </div>
+                        {res.description && (
+                          <p className="mt-1 text-xs text-muted leading-relaxed">
+                            {res.description}
+                          </p>
+                        )}
+                        {effectiveUrl && effectiveUrl !== "#" && (
+                          <span className="mt-2.5 inline-flex items-center gap-1 font-mono text-[11px] text-accent hover:underline break-all">
+                            <LinkIcon className="h-3 w-3 flex-shrink-0" />
+                            {effectiveUrl}
+                          </span>
+                        )}
                       </div>
-                      {res.description && (
-                        <p className="mt-1 text-xs text-muted leading-relaxed">
-                          {res.description}
-                        </p>
-                      )}
-                      {res.url && res.url !== "#" && (
-                        <span className="mt-2.5 inline-flex items-center gap-1 font-mono text-[11px] text-accent hover:underline break-all">
-                          <LinkIcon className="h-3 w-3 flex-shrink-0" />
-                          {res.url}
-                        </span>
-                      )}
-                    </div>
-                  </a>
-                ))}
+                    </a>
+                  );
+                })}
               </div>
             ) : (
               <p className="text-sm text-muted">
