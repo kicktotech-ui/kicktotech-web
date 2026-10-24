@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { listApplications } from "@/server/applications";
 import { isHackathonRecord, type ApplicationRecord } from "@/server/data";
+import { getMongoDb } from "@/server/data/mongodb";
 
 export const DEFAULT_SPREADSHEET_ID = "1jeMYVFs4l_cx8-pkfgfSI1vUd4fYTWnwMyV0u0Ksuvw";
 export const SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${DEFAULT_SPREADSHEET_ID}/edit?usp=sharing`;
@@ -31,10 +32,27 @@ export interface GoogleSheetsSyncResult {
 
 /**
  * Returns the configured Google Sheets Webhook URL or Service Account config.
+ * Checks both environment variables and MongoDB stored settings.
  */
-export function getGoogleSheetsConfig() {
-  const webhookUrl = process.env.GOOGLE_SHEETS_WEBHOOK_URL?.trim();
-  const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID?.trim() || DEFAULT_SPREADSHEET_ID;
+export async function getGoogleSheetsConfig() {
+  let webhookUrl = process.env.GOOGLE_SHEETS_WEBHOOK_URL?.trim();
+  let spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID?.trim() || DEFAULT_SPREADSHEET_ID;
+
+  // Fallback to database stored setting if environment variable is not defined
+  if (!webhookUrl) {
+    try {
+      const db = await getMongoDb();
+      const doc = await db.collection("settings").findOne({ _id: "google_sheets_config" as unknown as import("mongodb").ObjectId });
+      if (doc?.webhookUrl && typeof doc.webhookUrl === "string") {
+        webhookUrl = doc.webhookUrl.trim();
+      }
+      if (doc?.spreadsheetId && typeof doc.spreadsheetId === "string") {
+        spreadsheetId = doc.spreadsheetId.trim();
+      }
+    } catch {
+      // In-memory or pre-init fallback
+    }
+  }
 
   const clientEmail =
     process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim() ||
@@ -154,7 +172,7 @@ export async function getConfirmedHackathonParticipantsWithIds(): Promise<{
  * Perform a full sync of all confirmed participants into the Google Spreadsheet.
  */
 export async function syncAllConfirmedParticipantsToGoogleSheet(): Promise<GoogleSheetsSyncResult> {
-  const cfg = getGoogleSheetsConfig();
+  const cfg = await getGoogleSheetsConfig();
   const { rows } = await getConfirmedHackathonParticipantsWithIds();
 
   // 1. Try Google Apps Script Webhook (Priority 1: zero IAM friction, executes as Sheet owner)
@@ -180,8 +198,23 @@ export async function syncAllConfirmedParticipantsToGoogleSheet(): Promise<Googl
         };
       }
       console.warn(`[google-sheets] Webhook sync returned status ${resp.status}`);
+      const errText = await resp.text().catch(() => "");
+      return {
+        success: false,
+        syncedCount: rows.length,
+        method: "webhook",
+        error: `Google Apps Script returned HTTP ${resp.status}${errText ? `: ${errText.slice(0, 150)}` : ""}`,
+        spreadsheetUrl: cfg.spreadsheetUrl,
+      };
     } catch (whErr) {
       console.error("[google-sheets] Webhook sync failed:", whErr);
+      return {
+        success: false,
+        syncedCount: rows.length,
+        method: "webhook",
+        error: `Webhook connection failed: ${whErr instanceof Error ? whErr.message : String(whErr)}`,
+        spreadsheetUrl: cfg.spreadsheetUrl,
+      };
     }
   }
 
@@ -250,7 +283,7 @@ export async function syncAllConfirmedParticipantsToGoogleSheet(): Promise<Googl
  */
 export async function syncConfirmedHackathonParticipant(app: ApplicationRecord): Promise<void> {
   try {
-    const cfg = getGoogleSheetsConfig();
+    const cfg = await getGoogleSheetsConfig();
     if (!cfg.isConfigured) return;
 
     // Retrieve all to determine deterministic sequential ID

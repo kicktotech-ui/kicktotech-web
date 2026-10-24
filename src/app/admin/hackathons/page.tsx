@@ -23,9 +23,11 @@ import {
   ExternalLink,
   RefreshCw,
   LayoutDashboard,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HackathonDashboardEdit } from "@/components/admin/HackathonDashboardEdit";
+import { GoogleSheetsSyncModal } from "@/components/admin/GoogleSheetsSyncModal";
 
 const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1jeMYVFs4l_cx8-pkfgfSI1vUd4fYTWnwMyV0u0Ksuvw/edit?usp=sharing";
 
@@ -52,6 +54,7 @@ export default function HackathonManagerPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [showSyncModal, setShowSyncModal] = useState(false);
   const [stats, setStats] = useState({
     total: 0,
     paid: 0,
@@ -180,10 +183,15 @@ export default function HackathonManagerPage() {
       if (res.success) {
         toast.success(`Synced ${res.syncedCount} confirmed participants to Google Sheet!`);
       } else {
-        toast.error(res.error || "Google Sheet sync failed. Set GOOGLE_SHEETS_WEBHOOK_URL.");
+        if (res.error?.includes("GOOGLE_SHEETS_WEBHOOK_URL") || !res.method || res.method === "none") {
+          setShowSyncModal(true);
+        } else {
+          toast.error(res.error || "Google Sheet sync failed.");
+        }
       }
-    } catch (e) {
+    } catch {
       toast.error("Failed to sync with Google Sheet.");
+      setShowSyncModal(true);
     } finally {
       setIsSyncing(false);
     }
@@ -344,6 +352,15 @@ export default function HackathonManagerPage() {
               {isSyncing ? "Syncing..." : "Sync Google Sheet"}
             </Button>
             <Button
+              variant="ghost"
+              size="sm"
+              title="Configure Google Sheet Sync"
+              onClick={() => setShowSyncModal(true)}
+              className="text-adm-muted hover:text-adm-fg p-2"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+            <Button
               variant="secondary"
               disabled={isExporting}
               onClick={handleExport}
@@ -443,6 +460,12 @@ export default function HackathonManagerPage() {
           />
         </>
       )}
+
+      <GoogleSheetsSyncModal
+        open={showSyncModal}
+        onClose={() => setShowSyncModal(false)}
+        onSuccess={() => refresh()}
+      />
     </div>
   );
 }

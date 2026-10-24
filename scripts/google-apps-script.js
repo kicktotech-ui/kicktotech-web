@@ -51,7 +51,10 @@ function doPost(e) {
 
     var payload = JSON.parse(e.postData.contents);
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getActiveSheet();
+    if (!ss && payload.spreadsheetId) {
+      try { ss = SpreadsheetApp.openById(payload.spreadsheetId); } catch (e) {}
+    }
+    var sheet = ss ? ss.getActiveSheet() : SpreadsheetApp.getActiveSheet();
 
     // 1. Full Synchronization (Sync All / Update Current Data)
     if (payload.action === "sync_all" && payload.rows) {

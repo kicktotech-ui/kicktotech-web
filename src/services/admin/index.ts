@@ -163,6 +163,7 @@ export interface GoogleSheetsSyncStatus {
   hasServiceAccount: boolean;
   spreadsheetId: string;
   spreadsheetUrl: string;
+  webhookUrl?: string;
   confirmedCount: number;
 }
 
@@ -187,8 +188,8 @@ export const adminHackathonService = {
   async getGoogleSheetsStatus(): Promise<GoogleSheetsSyncStatus> {
     return api.get<GoogleSheetsSyncStatus>("/admin/hackathons/sheets");
   },
-  async syncGoogleSheets(): Promise<GoogleSheetsSyncResponse> {
-    return api.post<GoogleSheetsSyncResponse>("/admin/hackathons/sheets", {});
+  async syncGoogleSheets(data?: { webhookUrl?: string; spreadsheetId?: string }): Promise<GoogleSheetsSyncResponse> {
+    return api.post<GoogleSheetsSyncResponse>("/admin/hackathons/sheets", data || {});
   },
   async getDashboardConfig(): Promise<HackathonDashboardConfig> {
     return api.get<HackathonDashboardConfig>("/admin/hackathons/dashboard-config");
