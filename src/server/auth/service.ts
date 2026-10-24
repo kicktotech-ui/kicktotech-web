@@ -203,7 +203,7 @@ export function createPasswordResetToken(user: UserRecord): string {
     JSON.stringify({
       uid: user.id,
       email: user.email.toLowerCase().trim(),
-      hashSlice: user.passwordHash.slice(0, 10),
+      hashSlice: (user.passwordHash || "").slice(0, 10),
       exp: Date.now() + 3600_000, // 1 hour
       purpose: "pwd_reset",
     })
@@ -225,7 +225,7 @@ export async function verifyPasswordResetToken(token: string): Promise<UserRecor
     if (!user || user.status !== "active") return null;
     if (user.email.toLowerCase().trim() !== data.email.toLowerCase().trim()) return null;
     // Replay check: if password was already changed, hashSlice will not match
-    if (data.hashSlice && user.passwordHash.slice(0, 10) !== data.hashSlice) return null;
+    if (data.hashSlice && (user.passwordHash || "").slice(0, 10) !== data.hashSlice) return null;
 
     return user;
   } catch {

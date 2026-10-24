@@ -94,7 +94,7 @@ export async function sendBrevoEmail(
   }
 
   // --- 4. Verify sender email exists ---
-  const senderEmail = process.env.BREVO_SENDER_EMAIL?.trim();
+  const senderEmail = process.env.BREVO_SENDER_EMAIL?.trim() || "internships@kicktotech.in";
   const senderName = process.env.BREVO_SENDER_NAME?.trim() || "KICK To TECH";
   if (!senderEmail) {
     const msg = "BREVO_SENDER_EMAIL is not configured. Skipping email.";

@@ -36,7 +36,9 @@ export function getSessionSecret(): string {
 export function getPublicBaseUrl(): string {
   // If explicitly set (e.g. production domain in Vercel env settings)
   const explicit = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  if (explicit) return explicit.replace(/\/+$/, "");
+  if (explicit && (!isProd || !explicit.includes("localhost"))) {
+    return explicit.replace(/\/+$/, "");
+  }
   
   // If running on Vercel (Preview or Prod branch without explicit domain)
   const vercelUrl = process.env.NEXT_PUBLIC_VERCEL_URL?.trim() || process.env.VERCEL_URL?.trim();
