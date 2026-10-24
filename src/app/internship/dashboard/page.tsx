@@ -44,6 +44,7 @@ import { useAuth } from "@/components/providers";
 import { internshipProgram } from "@/data/mock/internship";
 import { formatINR, cn, formatDate } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { isInternshipMaintenance } from "@/config/features";
 import type {
   HackathonDashboardConfig,
   HackathonParticipantRecord,
@@ -176,6 +177,7 @@ function DashboardContent() {
   const hackathonEnrolled = Boolean(data?.hackathon.enrolled && isHackathonVerified);
   const hackathonConfig = data?.hackathon.config;
   const internshipEnrolled = Boolean(data?.internship.enrolled);
+  const maintenance = isInternshipMaintenance();
 
   return (
     <>
@@ -194,9 +196,16 @@ function DashboardContent() {
               </Button>
             )
           ) : activeTab === "internship" && !internshipEnrolled ? (
-            <Button href="/internship/register" size="sm">
-              <BookOpen className="mr-1.5 h-4 w-4" /> Enroll in a Domain
-            </Button>
+            maintenance ? (
+              <Button href="/hackathon" size="sm">
+                <Trophy className="h-3.5 w-3.5 mr-1 text-yellow-300" />
+                PromptWars Hackathon
+              </Button>
+            ) : (
+              <Button href="/internship/register" size="sm">
+                <BookOpen className="mr-1.5 h-4 w-4" /> Enroll in a Domain
+              </Button>
+            )
           ) : (
             <div className="flex items-center gap-2">
               <Button
@@ -210,6 +219,22 @@ function DashboardContent() {
           )
         }
       />
+
+      {maintenance && (
+        <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p className="font-semibold text-amber-100">Internship Batch Registrations Temporarily Paused</p>
+              <p className="text-xs text-amber-300/80 mt-0.5">
+                New internship enrollments are paused while our priority event PromptWars × KICK To TECH is active.
+              </p>
+            </div>
+            <Button href="/hackathon" size="sm" variant="outline" className="shrink-0">
+              View Hackathon <ArrowRight className="h-3 w-3 ml-1" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Cohort Section Switcher Cards (Interactive & Responsive) */}
       <div className="mb-8 grid gap-4 sm:gap-6 md:grid-cols-2">
@@ -829,18 +854,28 @@ function DashboardContent() {
         <div className="space-y-6">
           {!internshipEnrolled ? (
             <EmptyState
-              title="No active internship enrollment yet"
+              title={isInternshipMaintenance() ? "Internship admissions paused" : "No active internship enrollment yet"}
               icon={<BookOpen className="h-7 w-7 text-accent" />}
-              description="Choose a domain to begin your 5-week project-first internship. Work on real-world projects with dedicated mentorship."
+              description={
+                isInternshipMaintenance()
+                  ? "New internship batch admissions are temporarily paused while our priority event PromptWars × KICK To TECH Hackathon is active. Check out the hackathon to participate now!"
+                  : "Choose a domain to begin your 5-week project-first internship. Work on real-world projects with dedicated mentorship."
+              }
               action={
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                  <Button href="/internship" size="sm" variant="outline">
-                    Explore domains
+                isInternshipMaintenance() ? (
+                  <Button href="/hackathon" size="sm">
+                    Explore PromptWars Hackathon
                   </Button>
-                  <Button href="/internship/register" size="sm">
-                    Enroll now
-                  </Button>
-                </div>
+                ) : (
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                    <Button href="/internship" size="sm" variant="outline">
+                      Explore domains
+                    </Button>
+                    <Button href="/internship/register" size="sm">
+                      Enroll now
+                    </Button>
+                  </div>
+                )
               }
             />
           ) : (

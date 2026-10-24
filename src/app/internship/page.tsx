@@ -9,6 +9,8 @@ import { LearningJourney } from "@/components/sections/LearningJourney";
 import { CredentialSection } from "@/components/sections/CredentialSection";
 import { internshipProgram } from "@/data/mock/internship";
 import { formatINR } from "@/lib/utils";
+import { isInternshipMaintenance } from "@/config/features";
+import { InternshipMaintenanceView } from "@/components/views/InternshipMaintenanceView";
 
 export const metadata: Metadata = {
   title: "Internship",
@@ -31,6 +33,10 @@ const faqs = [
 ];
 
 export default function InternshipPage() {
+  if (isInternshipMaintenance()) {
+    return <InternshipMaintenanceView mode="page" />;
+  }
+
   return (
     <>
       {/* HERO */}

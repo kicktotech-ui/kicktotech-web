@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Search, CornerDownLeft, UserPlus, CalendarPlus, Award, Bell, Download, BarChart3, ArrowRight } from "lucide-react";
 import { flatNav } from "./nav";
 import { internService, certificateService } from "@/services/admin";
+import { FEATURES } from "@/config/features";
 import type { Intern, Certificate } from "@/lib/admin/types";
 import { useAdminTheme } from "./theme";
 import { cn } from "@/lib/utils";
@@ -40,14 +41,26 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   useEffect(() => {
     if (!open || q.trim().length < 2) { setInterns([]); setCerts([]); return; }
     let active = true;
-    (async () => {
-      const [i, c] = await Promise.all([
-        internService.query({ search: q, pageSize: 4 }),
-        certificateService.query({ search: q, pageSize: 3 }),
-      ]);
-      if (active) { setInterns(i.rows); setCerts(c.rows); }
-    })();
-    return () => { active = false; };
+    const timer = setTimeout(async () => {
+      try {
+        const internPromise = FEATURES.internshipMaintenance
+          ? Promise.resolve({ rows: [] as Intern[], total: 0, page: 1, pageSize: 4 })
+          : internService.query({ search: q, pageSize: 4 });
+
+        const [i, c] = await Promise.all([
+          internPromise,
+          certificateService.query({ search: q, pageSize: 3 }),
+        ]);
+        if (active) { setInterns(i.rows); setCerts(c.rows); }
+      } catch {
+        /* ignore fetch errors during unmount */
+      }
+    }, 300);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
   }, [q, open]);
 
   const pages = useMemo(() => flatNav.filter((p) => p.label.toLowerCase().includes(q.toLowerCase())).slice(0, 6), [q]);

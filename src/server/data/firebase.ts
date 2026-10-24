@@ -6,6 +6,7 @@ import {
   isHackathonRecord, parseRecordAmount, defaultAmountForDomain, detectBatch,
 } from "./index";
 import { uuid } from "../crypto";
+import { isInternshipMaintenance } from "@/config/features";
 
 /**
  * Firestore-backed DataStore (Admin SDK) mapped to the REAL existing schema of
@@ -395,19 +396,39 @@ export function createFirebaseStore(): DataStore {
 
     // ---- interns — READ from real `interns` ------------------------------
     async listStudents({ search, page, pageSize }): Promise<PageResult<UserRecord>> {
-      const db = await getAdminDb();
-      const snap = await db.collection(READ.interns).get();
-      let rows = snap.docs.map((doc) => mapIntern(doc.id, doc.data() as Doc));
-      if (search) {
-        const q = search.toLowerCase();
-        rows = rows.filter((u) => [u.name, u.email, u.phone ?? "", u.college ?? ""].some((v) => v.toLowerCase().includes(q)));
+      // Reversible maintenance mode: Zero Firestore reads when internships are paused.
+      if (isInternshipMaintenance()) {
+        return { rows: [], total: 0 };
       }
+
+      const db = await getAdminDb();
+      const colRef = db.collection(READ.interns);
+
+      // Quota-safe: server-side pagination when no substring search is needed
+      if (!search) {
+        const countSnap = await colRef.count().get();
+        const total = countSnap.data().count;
+        const offset = (page - 1) * pageSize;
+        const pageSnap = await colRef.offset(offset).limit(pageSize).get();
+        const rows = pageSnap.docs.map((doc) => mapIntern(doc.id, doc.data() as Doc));
+        return { rows, total };
+      }
+
+      // Bounded search fallback (capped to 100 docs to avoid Spark quota exhaustion)
+      const snap = await colRef.limit(100).get();
+      let rows = snap.docs.map((doc) => mapIntern(doc.id, doc.data() as Doc));
+      const q = search.toLowerCase();
+      rows = rows.filter((u) => [u.name, u.email, u.phone ?? "", u.college ?? ""].some((v) => v.toLowerCase().includes(q)));
       rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       const total = rows.length;
       const start = (page - 1) * pageSize;
       return { rows: rows.slice(start, start + pageSize), total };
     },
     async countStudents() {
+      // Reversible maintenance mode: Zero Firestore reads when internships are paused.
+      if (isInternshipMaintenance()) {
+        return 0;
+      }
       const db = await getAdminDb();
       const agg = await db.collection(READ.interns).count().get();
       return agg.data().count;

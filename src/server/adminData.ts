@@ -1,4 +1,5 @@
 import { getAdminDb } from "./firebase/admin";
+import { isInternshipMaintenance } from "@/config/features";
 import type {
   Intern, Certificate, Mentor, Activation, AdminNotification, DomainSlug,
   InternStatus, PaymentStatus, CertStatus, ActivationStatus, NotificationType,
@@ -227,6 +228,11 @@ function applyFilters(rows: Record<string, unknown>[], def: Mapped, opts: QueryO
 export async function queryCollection(name: string, opts: QueryOpts): Promise<QueryResult> {
   const def = REGISTRY[name];
   if (!def) return { rows: [], total: 0, row: opts.id ? null : undefined };
+
+  // Reversible maintenance: completely bypass /interns collection reads while maintenance is active.
+  if (name === "interns" && isInternshipMaintenance()) {
+    return { rows: [], total: 0, row: opts.id ? null : undefined };
+  }
 
   try {
     const db = await getAdminDb();

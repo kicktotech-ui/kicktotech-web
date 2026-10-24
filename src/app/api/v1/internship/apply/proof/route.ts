@@ -1,6 +1,7 @@
-import { route, ok, parseJson } from "@/server/http";
+import { route, ok, parseJson, fail } from "@/server/http";
 import { paymentProofSchema } from "@/server/validation";
 import { submitPaymentProof } from "@/server/applications";
+import { isInternshipMaintenance } from "@/config/features";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,6 +12,15 @@ export const dynamic = "force-dynamic";
  * confirmation — verification remains a manual admin action.
  */
 export const POST = route(async (req, { requestId }) => {
+  if (isInternshipMaintenance()) {
+    return fail(
+      "MAINTENANCE_MODE",
+      "Internship payment submissions are temporarily paused. If you need assistance with an existing registration, please contact support at contact@kicktotech.in.",
+      undefined,
+      requestId,
+    );
+  }
+
   const { applicationId } = await parseJson(req, paymentProofSchema);
   const application = await submitPaymentProof(applicationId);
   return ok({ applicationId: application.applicationId, status: application.status }, { requestId });

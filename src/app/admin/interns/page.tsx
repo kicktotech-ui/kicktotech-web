@@ -9,6 +9,8 @@ import { useToast } from "@/components/admin/toast";
 import { internService } from "@/services/admin";
 import { domainLabel } from "@/data/admin";
 import type { Intern } from "@/lib/admin/types";
+import { FEATURES } from "@/config/features";
+import { AlertCircle } from "lucide-react";
 
 const columns: Column<Intern>[] = [
   { key: "internId", header: "Intern ID", render: (r) => <span className="font-mono text-xs text-adm-muted">{r.internId}</span> },
@@ -55,9 +57,24 @@ export default function InternsPage() {
           <Button variant="primary" onClick={() => toast.info("New interns currently onboard through the application flow. Direct admin creation is coming soon.")}><UserPlus className="h-4 w-4" /> Add intern</Button>
         </>}
       />
+      {FEATURES.internshipMaintenance && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+          <div>
+            <p className="font-semibold text-amber-100">Intern Queries Paused (Maintenance Mode)</p>
+            <p className="text-xs text-amber-300/80 mt-0.5 leading-relaxed">
+              Firestore queries for the <code>/interns</code> collection are paused to protect the Spark plan quota while the live PromptWars Hackathon registrations are active. To restore intern browsing, set <code>NEXT_PUBLIC_INTERNSHIP_MAINTENANCE=&quot;false&quot;</code> in your deployment environment.
+            </p>
+          </div>
+        </div>
+      )}
       <DataTable
         columns={columns}
-        fetcher={(p) => internService.query(p)}
+        fetcher={
+          FEATURES.internshipMaintenance
+            ? async () => ({ rows: [], total: 0, page: 1, pageSize: 10 })
+            : (p) => internService.query(p)
+        }
         searchPlaceholder="Search by name, email, phone, ID, college..."
         onRowClick={(r) => router.push(`/admin/interns/${r.id}`)}
         selectable

@@ -9,8 +9,14 @@ import { Card } from "@/components/ui";
 import { Button } from "@/components/ui/Button";
 import { FormField, Input } from "@/components/forms/fields";
 import { SuccessState } from "@/components/feedback/states";
+import { isInternshipMaintenance } from "@/config/features";
+import { InternshipMaintenanceView } from "@/components/views/InternshipMaintenanceView";
 
 export default function ActivatePage() {
+  if (isInternshipMaintenance()) {
+    return <InternshipMaintenanceView mode="portal" />;
+  }
+
   return (
     <RequireAuth permission="view_dashboard">
       <DashboardShell>

@@ -1,11 +1,12 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Sparkles, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { MagneticButton } from "@/components/motion";
 import { EcosystemVisual } from "./EcosystemVisual";
 import { easePremium } from "@/lib/motion";
+import { isInternshipMaintenance } from "@/config/features";
 
 const fade = {
   hidden: { opacity: 0, y: 18 },
@@ -17,6 +18,8 @@ const fade = {
 };
 
 export function Hero() {
+  const maintenance = isInternshipMaintenance();
+
   return (
     <section className="relative overflow-hidden">
       {/* ambient glow behind the network */}
@@ -29,7 +32,15 @@ export function Hero() {
             custom={0} variants={fade} initial="hidden" animate="show"
             className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-accent"
           >
-            <Sparkles className="h-3.5 w-3.5" /> Pune&apos;s Student Tech Community
+            {maintenance ? (
+              <>
+                <Trophy className="h-3.5 w-3.5 text-yellow-300" /> Priority Event • PromptWars Hackathon 2026
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-3.5 w-3.5" /> Pune&apos;s Student Tech Community
+              </>
+            )}
           </motion.span>
 
           <motion.h1
@@ -54,9 +65,16 @@ export function Hero() {
             className="mt-9 flex flex-col items-center gap-3 sm:flex-row lg:justify-start sm:justify-center"
           >
             <MagneticButton>
-              <Button href="/internship" size="lg">
-                Explore Internships <ArrowRight className="h-4 w-4" />
-              </Button>
+              {maintenance ? (
+                <Button href="/hackathon" size="lg">
+                  <Trophy className="h-4 w-4 text-yellow-300" />
+                  Explore PromptWars Hackathon <ArrowRight className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button href="/internship" size="lg">
+                  Explore Internships <ArrowRight className="h-4 w-4" />
+                </Button>
+              )}
             </MagneticButton>
             <Button href="/join" variant="outline" size="lg">
               Join the Community

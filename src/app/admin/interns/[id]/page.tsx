@@ -10,6 +10,7 @@ import { internService, paymentService, certificateService } from "@/services/ad
 import { domainLabel } from "@/data/admin";
 import type { Intern, Payment, Certificate } from "@/lib/admin/types";
 import { formatDate, formatINR } from "@/lib/utils";
+import { FEATURES } from "@/config/features";
 
 const TABS = ["Overview", "Payments", "Certificates", "Activity"] as const;
 
@@ -24,6 +25,10 @@ export default function InternProfilePage() {
   const [suspendOpen, setSuspendOpen] = useState(false);
 
   useEffect(() => {
+    if (FEATURES.internshipMaintenance) {
+      setIntern(null);
+      return;
+    }
     (async () => {
       const found = await internService.getById(id);
       setIntern(found);
@@ -37,6 +42,16 @@ export default function InternProfilePage() {
       }
     })();
   }, [id]);
+
+  if (FEATURES.internshipMaintenance) {
+    return (
+      <EmptyState
+        title="Intern details paused (Maintenance Mode)"
+        description="Intern queries are temporarily paused to protect Firestore read quotas during the Hackathon priority period. Set NEXT_PUBLIC_INTERNSHIP_MAINTENANCE='false' to restore."
+        action={<Button variant="secondary" href="/admin">Back to dashboard</Button>}
+      />
+    );
+  }
 
   if (intern === undefined) {
     return <div className="space-y-4"><Skeleton className="h-28 rounded-xl" /><Skeleton className="h-64 rounded-xl" /></div>;
