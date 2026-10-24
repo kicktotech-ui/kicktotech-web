@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 /** Get Google Sheets sync configuration & current confirmed count. */
 export const GET = route(async (req, { requestId }) => {
-  await requireAdmin("applications.read");
+  await requireAdmin("applications.read", req);
   const cfg = getGoogleSheetsConfig();
   const { records } = await getConfirmedHackathonParticipantsWithIds();
 
@@ -30,7 +30,7 @@ export const GET = route(async (req, { requestId }) => {
 
 /** Trigger synchronization of all confirmed registrations to Google Sheets. */
 export const POST = route(async (req, { requestId }) => {
-  await requireAdmin("applications.update");
+  await requireAdmin("applications.update", req);
   const result = await syncAllConfirmedParticipantsToGoogleSheet();
 
   return ok({ ...result }, { requestId });

@@ -13,8 +13,8 @@ export const dynamic = "force-dynamic";
  * GET /api/v1/admin/hackathons/dashboard-config
  * Read the current Hackathon Dashboard configuration for the admin editor.
  */
-export const GET = route(async (_req, { requestId }) => {
-  await requireAdmin("applications.read");
+export const GET = route(async (req, { requestId }) => {
+  await requireAdmin("applications.read", req);
   const config = await getHackathonDashboardConfig();
   return ok(config, { requestId });
 });
@@ -25,7 +25,7 @@ export const GET = route(async (_req, { requestId }) => {
  * Changes immediately reflect on participant dashboards.
  */
 export const POST = route(async (req, { requestId }) => {
-  const admin = await requireAdmin("applications.update");
+  const admin = await requireAdmin("applications.update", req);
   const body = await parseJson(req, hackathonDashboardConfigSchema);
   const updated = await saveHackathonDashboardConfig(body, {
     actor: admin.user.email,

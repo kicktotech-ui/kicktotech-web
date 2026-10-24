@@ -22,6 +22,9 @@ export function getSessionSecret(): string {
     process.env.FIREBASE_PRIVATE_KEY ||
     process.env.RAZORPAY_KEY_SECRET;
   if (value && value.length > 0) return value;
+  if (isProd) {
+    throw new Error("AUTH_SESSION_SECRET must be configured in production environment variables.");
+  }
   return "ktt-session-secret-fallback-" + (process.env.FIREBASE_PROJECT_ID || "kicktotech");
 }
 

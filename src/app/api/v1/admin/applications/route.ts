@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 /** List applications with pagination + filter (type: internship vs hackathon, domain, status). */
 export const GET = route(async (req, { requestId }) => {
-  await requireAdmin("applications.read");
+  await requireAdmin("applications.read", req);
   const url = new URL(req.url);
   const search = (url.searchParams.get("search") ?? "").trim().toLowerCase();
   const status = url.searchParams.get("status") ?? undefined;
@@ -100,7 +100,7 @@ export const GET = route(async (req, { requestId }) => {
 
 /** Admin creates a new internship application directly. */
 export const POST = route(async (req, { requestId }) => {
-  const { user } = await requireAdmin("applications.update");
+  const { user } = await requireAdmin("applications.update", req);
   const body = await parseJson(req, adminCreateApplicationSchema);
   const result = await createAdminApplication(body, { actor: user.email, requestId });
   return ok(result, { status: 201, requestId });
@@ -108,7 +108,7 @@ export const POST = route(async (req, { requestId }) => {
 
 /** Admin payment & lifecycle decisions: verify, reject, grant_access, or update record. */
 export const PATCH = route(async (req, { requestId }) => {
-  const { user } = await requireAdmin("applications.update");
+  const { user } = await requireAdmin("applications.update", req);
   const body = await parseJson(req, applicationDecisionSchema);
   const { applicationId, action, reason, patch } = body;
 

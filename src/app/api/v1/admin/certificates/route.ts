@@ -7,13 +7,13 @@ import { verificationUrlFor } from "@/server/config";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export const GET = route(async (_req, { requestId }) => {
-  await requireAdmin("certificates.read");
+export const GET = route(async (req, { requestId }) => {
+  await requireAdmin("certificates.read", req);
   return ok({ certificates: await listCertificates() }, { requestId });
 });
 
 export const POST = route(async (req, { requestId }) => {
-  const { user } = await requireAdmin("certificates.issue");
+  const { user } = await requireAdmin("certificates.issue", req);
   const input = await parseJson(req, issueCertificateSchema);
   const { certificate, duplicate } = await issueCertificate(input, { actor: user.email, requestId });
   return ok(
@@ -23,7 +23,7 @@ export const POST = route(async (req, { requestId }) => {
 });
 
 export const DELETE = route(async (req, { requestId }) => {
-  const { user } = await requireAdmin("certificates.revoke");
+  const { user } = await requireAdmin("certificates.revoke", req);
   const { certificateId } = await parseJson(req, revokeCertificateSchema);
   const certificate = await revokeCertificate(certificateId, { actor: user.email, requestId });
   return ok({ certificate }, { requestId });

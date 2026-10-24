@@ -7,8 +7,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** Real system health — performs a live database probe. */
-export const GET = route(async (_req, { requestId }) => {
-  await requireAdmin("system.read");
+export const GET = route(async (req, { requestId }) => {
+  await requireAdmin("system.read", req);
 
   let dbStatus: SystemService;
   try {
@@ -23,7 +23,8 @@ export const GET = route(async (_req, { requestId }) => {
         : "In-memory mode · Set MONGODB_URI in deployment environment variables to sync real database",
     };
   } catch (err) {
-    dbStatus = { name: "Database", state: "NOT_CONNECTED", detail: `Database unreachable: ${(err as Error)?.message || "Check connection"}` };
+    console.error("[system] Database connection probe failed:", err);
+    dbStatus = { name: "Database", state: "NOT_CONNECTED", detail: "Database unreachable. Check connection logs." };
   }
 
   const services: SystemService[] = [

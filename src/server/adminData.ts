@@ -9,6 +9,9 @@ import type {
 type Doc = Record<string, unknown>;
 const str = (v: unknown) => (typeof v === "string" ? v : v == null ? "" : String(v));
 const num = (v: unknown) => (typeof v === "number" ? v : Number(v) || 0);
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 function iso(v: unknown): string {
   if (!v) return "";
   if (typeof v === "string") return v;
@@ -274,7 +277,7 @@ export async function queryCollection(name: string, opts: QueryOpts): Promise<Qu
     }
 
     if (opts.search && opts.search.trim()) {
-      const regex = new RegExp(opts.search.trim(), "i");
+      const regex = new RegExp(escapeRegex(opts.search.trim()), "i");
       filter.$or = [
         { name: regex },
         { email: regex },

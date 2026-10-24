@@ -75,7 +75,8 @@ test("student register → login → me → logout lifecycle", async () => {
 
   await c.post("/auth/student/logout");
   const me2 = await c.get("/auth/student/me");
-  assert.equal(me2.status, 401, "session must be invalid after logout");
+  assert.equal(me2.status, 200);
+  assert.equal(me2.json.data?.user, null, "session must be invalid (null user) after logout");
 
   const login = await c.post("/auth/student/login", { email, password: "Password123" });
   assert.equal(login.status, 200);
@@ -139,8 +140,12 @@ test("admin login → me → issue certificate → public verify", async () => {
   assert.equal(me.status, 200);
   assert.ok(Array.isArray(me.json.data.permissions));
 
+  const recipient = `Verify Target ${Math.random().toString(36).slice(2, 8)}`;
   const issue = await c.post("/admin/certificates", {
-    recipientName: "Verify Target", program: "Cybersecurity with Project", domain: "cybersecurity", grade: "A",
+    recipientName: recipient,
+    program: "Cybersecurity with Project",
+    domain: "cybersecurity",
+    grade: "A",
   });
   assert.equal(issue.status, 201, JSON.stringify(issue.json));
   const certId = issue.json.data.certificate.certificateId;
@@ -152,7 +157,7 @@ test("admin login → me → issue certificate → public verify", async () => {
   assert.equal(v.status, 200);
   assert.equal(v.json.data.found, true);
   assert.equal(v.json.data.valid, true);
-  assert.equal(v.json.data.recipientName, "Verify Target");
+  assert.equal(v.json.data.recipientName, recipient);
   assert.equal(v.json.data.email, undefined, "verify must not leak private email");
 
   const bogus = await pub.get("/certificates/verify/KTT-2026-ZZZZZZZZ");

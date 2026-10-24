@@ -26,47 +26,16 @@ export interface AuthenticatedStudent {
  * Throws UNAUTHENTICATED (HTTP 401) if neither is valid.
  */
 export async function requireAuthenticatedStudent(req: Request): Promise<AuthenticatedStudent> {
-  // 1. Check Bearer token from Authorization header
-  const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
-  if (authHeader?.startsWith("Bearer ")) {
-    const rawToken = authHeader.substring(7).trim();
-    if (rawToken) {
-      const sessionId = unsign(rawToken);
-      if (sessionId) {
-        const store = getStore();
-        const session = await store.getSessionById(sessionId);
-        if (session && session.type === "student" && Date.now() <= new Date(session.expiresAt).getTime()) {
-          const user = await store.getUserById(session.userId);
-          if (user && user.status === "active") {
-            return {
-              id: user.id,
-              email: user.email.toLowerCase().trim(),
-              name: user.name,
-              role: user.role,
-            };
-          }
-        }
-      }
-    }
+  const ctx = await readSession("student", req);
+  if (!ctx || !ctx.user || ctx.user.status !== "active") {
+    throw new AppError("UNAUTHENTICATED", "You must be signed in to access this resource.");
   }
-
-  // 2. Check server-side session cookie
-  try {
-    const ctx = await readSession("student");
-    if (ctx?.user && ctx.user.status === "active") {
-      return {
-        id: ctx.user.id,
-        email: ctx.user.email.toLowerCase().trim(),
-        name: ctx.user.name,
-        role: ctx.user.role,
-      };
-    }
-  } catch (err) {
-    console.warn("[guard] Server session verification failed:", err);
-  }
-
-  // Neither passed
-  throw new AppError("UNAUTHENTICATED", "You must be signed in to access this resource.");
+  return {
+    id: ctx.user.id,
+    email: ctx.user.email.toLowerCase().trim(),
+    name: ctx.user.name,
+    role: ctx.user.role,
+  };
 }
 
 export async function requireStudent(req?: Request): Promise<UserRecord> {

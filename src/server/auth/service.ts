@@ -1,3 +1,4 @@
+import { timingSafeEqual, createHash } from "node:crypto";
 import { config } from "../config";
 import { AppError } from "../http";
 import { hashPassword, verifyPassword } from "../crypto";
@@ -5,6 +6,13 @@ import { getStore, type UserRecord } from "../data";
 import { createSession, clearSession, publicUser, type PublicUser } from "./session";
 import { writeAudit } from "../audit";
 import type { StudentRegisterInput, LoginInput } from "../validation";
+
+function safeCompare(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  const hashA = createHash("sha256").update(a).digest();
+  const hashB = createHash("sha256").update(b).digest();
+  return timingSafeEqual(hashA, hashB);
+}
 
 function isReservedAdminEmail(email: string): boolean {
   return email === config.admin.email || email.endsWith(config.adminEmailDomain);
@@ -120,7 +128,7 @@ export async function loginAdmin(input: LoginInput, meta: { ip: string; requestI
   if (
     bootstrapPassword &&
     (normEmail === config.admin.email || isReservedAdminEmail(normEmail)) &&
-    input.password === bootstrapPassword
+    safeCompare(input.password, bootstrapPassword)
   ) {
     let admin = await store.findUserByEmail(normEmail);
     if (!admin) {
@@ -161,7 +169,7 @@ export async function loginAdmin(input: LoginInput, meta: { ip: string; requestI
 
   const isPasswordValid =
     (Boolean(admin.passwordHash) && verifyPassword(input.password, admin.passwordSalt, admin.passwordHash)) ||
-    (Boolean(bootstrapPassword) && input.password === bootstrapPassword);
+    (Boolean(bootstrapPassword) && safeCompare(input.password, bootstrapPassword));
 
   if (!isPasswordValid) {
     await writeAudit({ actor: input.email, action: "ADMIN_LOGIN", result: "FAILED", requestId: meta.requestId, ip: meta.ip });
@@ -179,7 +187,11 @@ export async function loginAdmin(input: LoginInput, meta: { ip: string; requestI
 
 // ---- Logout ----------------------------------------------------------------
 
-export async function logout(type: "student" | "admin", meta: { actor?: string; requestId: string; ip: string }): Promise<void> {
-  await clearSession(type);
+export async function logout(
+  type: "student" | "admin",
+  meta: { actor?: string; requestId: string; ip: string },
+  req?: Request,
+): Promise<void> {
+  await clearSession(type, req);
   await writeAudit({ actor: meta.actor ?? "unknown", action: type === "admin" ? "ADMIN_LOGOUT" : "STUDENT_LOGOUT", requestId: meta.requestId, ip: meta.ip });
 }

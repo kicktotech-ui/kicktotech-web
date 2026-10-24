@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export const POST = route(async (req, { requestId }) => {
   const actor = (await readSession("student", req))?.user.email;
-  await logout("student", { actor, requestId, ip: clientIp(req) });
+  await logout("student", { actor, requestId, ip: clientIp(req) }, req);
   const res = ok({ loggedOut: true }, { requestId });
   res.cookies.delete(config.cookies.student);
   return res;

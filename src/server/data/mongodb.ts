@@ -17,6 +17,10 @@ import { AppError } from "../http";
  * Replaces Firebase Firestore completely.
  */
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function getMongoUri(): string {
   const uri = process.env.MONGODB_URI?.trim();
   if (!uri) {
@@ -115,7 +119,7 @@ export function createMongoStore(): DataStore {
       const db = await getMongoDb();
       const filter: Record<string, unknown> = { type: "student" };
       if (search && search.trim()) {
-        const regex = new RegExp(search.trim(), "i");
+        const regex = new RegExp(escapeRegex(search.trim()), "i");
         filter.$or = [
           { name: regex },
           { email: regex },

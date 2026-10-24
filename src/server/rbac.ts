@@ -44,8 +44,9 @@ export function isAdminRole(role: string): role is AdminRole {
 
 export function permissionsFor(role: AdminRole | string): Permission[] {
   if (!role) return [];
-  const upper = (role.toUpperCase() === "ADMIN" ? "SUPER_ADMIN" : role.toUpperCase()) as AdminRole;
-  return ROLE_PERMISSIONS[upper] ?? ROLE_PERMISSIONS["SUPER_ADMIN"] ?? [];
+  const upper = role.toUpperCase() as AdminRole;
+  if (!isAdminRole(upper)) return [];
+  return ROLE_PERMISSIONS[upper] ?? [];
 }
 
 export function hasPermission(role: AdminRole | string, permission: Permission): boolean {

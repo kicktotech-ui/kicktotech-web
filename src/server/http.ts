@@ -36,21 +36,49 @@ export class AppError extends Error {
 const SECURITY_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
-  "Referrer-Policy": "no-referrer",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
   "Cache-Control": "no-store",
 };
+
+/**
+ * Validates CORS origins against an authoritative allowlist.
+ * Prevents arbitrary origin reflection with credentials.
+ */
+function isAllowedOrigin(origin: string): boolean {
+  if (!origin) return false;
+  try {
+    const url = new URL(origin);
+    const host = url.hostname.toLowerCase();
+    // Allow primary domains
+    if (host === "kicktotech.in" || host === "www.kicktotech.in") return true;
+    // Allow Render deployment backend
+    if (host === "kicktotech-web.onrender.com") return true;
+    // Allow official Vercel preview / deployment subdomains
+    if (host.endsWith(".vercel.app") && (host.includes("kicktotech") || host.includes("kick-to-tech"))) return true;
+    // Allow local development environments
+    if (process.env.NODE_ENV !== "production") {
+      if (host === "localhost" || host === "127.0.0.1") return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
 
 function withHeaders(res: NextResponse, requestId: string, req?: Request): NextResponse {
   for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.headers.set(k, v);
   res.headers.set("X-Request-Id", requestId);
 
-  // CORS support: allow Vercel frontend and custom domain
+  // CORS support: only allow verified, trusted origins
   const origin = req?.headers.get("origin");
-  if (origin) {
+  if (origin && isAllowedOrigin(origin)) {
     res.headers.set("Access-Control-Allow-Origin", origin);
     res.headers.set("Access-Control-Allow-Credentials", "true");
     res.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
     res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-Request-Id, X-Admin-Token, X-Session-Token");
+    res.headers.set("Vary", "Origin");
   }
 
   return res;

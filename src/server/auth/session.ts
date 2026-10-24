@@ -116,9 +116,15 @@ export async function readSession(type: AccountType, req?: Request): Promise<{ s
       if (user && user.status === "active") {
         return { session, user };
       }
+      return null;
     }
 
-    // 2. Resilient Fallback: Token is cryptographically signed and unexpired
+    // If using persistent database (MongoDB) and session was not found, it was revoked or expired
+    if (Boolean(process.env.MONGODB_URI) || config.dataBackend === "mongodb") {
+      return null;
+    }
+
+    // 2. Dev-only Memory Fallback: Recover session across local process restarts
     if (parsed.uid) {
       const user = await store.getUserById(parsed.uid);
       if (user && user.status === "active") {
@@ -168,16 +174,40 @@ export async function readSession(type: AccountType, req?: Request): Promise<{ s
   }
 }
 
-export async function clearSession(type: AccountType): Promise<void> {
+export async function clearSession(type: AccountType, req?: Request): Promise<void> {
+  let raw: string | undefined;
   try {
-    const raw = cookies().get(cookieName(type))?.value;
-    if (raw) {
-      const sessionId = unsign(raw);
-      if (sessionId) await getStore().deleteSession(sessionId);
+    raw = cookies().get(cookieName(type))?.value;
+  } catch {
+    // Outside cookie scope
+  }
+
+  if (!raw && req) {
+    try {
+      const authHeader = req.headers.get("authorization") || req.headers.get("Authorization");
+      if (authHeader?.startsWith("Bearer ")) {
+        raw = authHeader.substring(7).trim();
+      }
+      if (!raw) {
+        raw = req.headers.get("x-admin-token") || req.headers.get("x-session-token") || undefined;
+      }
+    } catch {
+      // Outside headers context
     }
+  }
+
+  if (raw) {
+    const parsed = parseSessionToken(raw);
+    const sid = parsed?.sid;
+    if (sid) {
+      await getStore().deleteSession(sid).catch(() => {});
+    }
+  }
+
+  try {
     cookies().delete(cookieName(type));
   } catch {
-    // Outside request scope
+    // Outside cookie scope
   }
 }
 
