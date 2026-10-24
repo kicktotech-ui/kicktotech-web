@@ -6,7 +6,8 @@ import { uuid } from "./crypto";
 
 export type ErrorCode =
   | "VALIDATION_ERROR" | "INVALID_CREDENTIALS" | "UNAUTHENTICATED" | "FORBIDDEN"
-  | "NOT_FOUND" | "CONFLICT" | "RATE_LIMITED" | "BOOTSTRAP_REQUIRED" | "MAINTENANCE_MODE" | "SERVER_ERROR";
+  | "NOT_FOUND" | "CONFLICT" | "RATE_LIMITED" | "BOOTSTRAP_REQUIRED" | "MAINTENANCE_MODE" | "SERVER_ERROR"
+  | "SERVICE_UNAVAILABLE";
 
 const STATUS: Record<ErrorCode, number> = {
   VALIDATION_ERROR: 400,
@@ -19,6 +20,7 @@ const STATUS: Record<ErrorCode, number> = {
   BOOTSTRAP_REQUIRED: 503,
   MAINTENANCE_MODE: 503,
   SERVER_ERROR: 500,
+  SERVICE_UNAVAILABLE: 503,
 };
 
 export class AppError extends Error {

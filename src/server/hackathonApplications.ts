@@ -15,6 +15,7 @@ import {
   createRazorpayOrder,
   verifyPaymentSignature,
   fetchRazorpayPayment,
+  fetchRazorpayOrder,
   getRazorpayConfig,
 } from "./payments/razorpay";
 import { syncConfirmedHackathonParticipant } from "./integrations/googleSheets";
@@ -178,6 +179,41 @@ export async function createHackathonPaymentOrder(
   }
 
   const { keyId } = getRazorpayConfig();
+
+  // Reuse existing Razorpay order ONLY if application is PAYMENT_PENDING and order is verified as active on Razorpay.
+  // Inconclusive/transient failures throw immediately and will NOT create a replacement order.
+  if (app.status === "PAYMENT_PENDING" && app.razorpayOrderId) {
+    const existingOrder = await fetchRazorpayOrder(app.razorpayOrderId);
+    if (
+      existingOrder &&
+      existingOrder.amount === HACKATHON_FEE_PAISE &&
+      existingOrder.currency === HACKATHON_CURRENCY &&
+      (existingOrder.status === "created" || existingOrder.status === "attempted")
+    ) {
+      return {
+        orderId: existingOrder.id,
+        amount: existingOrder.amount,
+        currency: existingOrder.currency,
+        keyId,
+        applicationId: app.applicationId,
+        alreadyPaid: false,
+      };
+    } else if (existingOrder && existingOrder.status === "paid") {
+      return {
+        orderId: existingOrder.id,
+        amount: existingOrder.amount,
+        currency: existingOrder.currency,
+        keyId,
+        applicationId: app.applicationId,
+        alreadyPaid: true,
+      };
+    }
+
+    // Existing order is authoritatively confirmed missing (null / 404) or cancelled/expired on Razorpay
+    console.info(
+      `[hackathon] Existing order ${app.razorpayOrderId} for ${app.applicationId} is authoritatively confirmed unusable (${existingOrder?.status ?? "not_found"}). Creating fresh replacement order.`,
+    );
+  }
 
   // Create order on Razorpay
   const order = await createRazorpayOrder({

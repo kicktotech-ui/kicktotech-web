@@ -123,6 +123,144 @@ export async function createRazorpayOrder(
 }
 
 /**
+ * Fetch authoritative order details from Razorpay API.
+ *
+ * Distinguishes between:
+ *  - Confirmed missing or invalid (HTTP 404 / 400) -> returns null
+ *  - Transient / Inconclusive gateway errors (429 / 5xx / network drop) -> throws AppError
+ */
+export async function fetchRazorpayOrder(
+  orderId: string,
+): Promise<RazorpayOrderResult | null> {
+  const { keyId, keySecret } = getRazorpayConfig();
+
+  let res: Response;
+  try {
+    res = await fetch(`${RAZORPAY_API_BASE}/orders/${encodeURIComponent(orderId)}`, {
+      method: "GET",
+      headers: {
+        Authorization: basicAuthHeader(keyId, keySecret),
+      },
+    });
+  } catch (netErr) {
+    console.error(`[razorpay] Network failure while verifying order ${orderId}:`, netErr);
+    throw new AppError(
+      "SERVICE_UNAVAILABLE",
+      "Payment gateway is temporarily unreachable. Please try again shortly.",
+      { cause: "NETWORK_ERROR" },
+    );
+  }
+
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => null)) as {
+      error?: { code?: string; description?: string; field?: string };
+    } | null;
+    const errCode = (errBody?.error?.code || "").toUpperCase();
+    const errDesc = (errBody?.error?.description || "").toLowerCase();
+
+    // 1. Authoritative 404 (Not Found) -> order confirmed nonexistent on Razorpay
+    if (res.status === 404) {
+      console.warn(`[razorpay] Order ${orderId} authoritatively confirmed nonexistent (404): ${errBody?.error?.description || "Not Found"}`);
+      return null;
+    }
+
+    // 2. HTTP 400 (Bad Request) -> inspect body; only treat as unusable if explicitly confirmed missing
+    if (res.status === 400) {
+      const isConfirmedNonexistent =
+        errDesc.includes("does not exist") ||
+        errDesc.includes("order not found") ||
+        errCode === "BAD_REQUEST_ORDER_NOT_FOUND" ||
+        errCode === "INVALID_ORDER_ID";
+
+      if (isConfirmedNonexistent) {
+        console.warn(`[razorpay] Order ${orderId} authoritatively confirmed invalid by Razorpay (400): ${errDesc}`);
+        return null;
+      }
+
+      // If HTTP 400 is due to authentication, invalid credentials, or header/config issues
+      const isAuthOrConfigError =
+        errDesc.includes("auth") ||
+        errDesc.includes("key") ||
+        errDesc.includes("secret") ||
+        errDesc.includes("unauthorized") ||
+        errCode.includes("AUTH");
+
+      if (isAuthOrConfigError) {
+        console.error(`[razorpay] Gateway client/auth configuration error (400) checking order ${orderId}:`, errBody?.error);
+        throw new AppError(
+          "SERVER_ERROR",
+          "Payment service configuration error. Please contact administrator.",
+          { cause: "AUTH_CONFIG_ERROR", details: errBody?.error },
+        );
+      }
+
+      // Other inconclusive 400 errors (malformed request, unexpected parameter) -> DO NOT create replacement order
+      console.error(`[razorpay] Inconclusive bad request error (400) checking order ${orderId}:`, errBody?.error);
+      throw new AppError(
+        "SERVICE_UNAVAILABLE",
+        "Payment service could not verify order details. Please try again shortly.",
+        { cause: "INCONCLUSIVE_BAD_REQUEST", details: errBody?.error },
+      );
+    }
+
+    // 3. HTTP 401 / 403 -> Authentication / Permission error
+    if (res.status === 401 || res.status === 403) {
+      console.error(`[razorpay] Gateway authentication failure (${res.status}) checking order ${orderId}:`, errBody?.error);
+      throw new AppError(
+        "SERVER_ERROR",
+        "Payment gateway authentication failure. Please contact administrator.",
+        { cause: "AUTH_FAILURE", status: res.status },
+      );
+    }
+
+    // 4. HTTP 429 -> Rate Limited
+    if (res.status === 429) {
+      console.warn(`[razorpay] Rate limit reached checking order ${orderId}`);
+      throw new AppError(
+        "RATE_LIMITED",
+        "Payment gateway rate limit reached. Please try again shortly.",
+        { cause: "RATE_LIMITED" },
+      );
+    }
+
+    // 5. HTTP 5xx -> Upstream Razorpay server or gateway error (Inconclusive)
+    if (res.status >= 500) {
+      console.error(`[razorpay] Upstream gateway error (${res.status}) checking order ${orderId}:`, errBody?.error);
+      throw new AppError(
+        "SERVICE_UNAVAILABLE",
+        "Payment gateway is temporarily experiencing issues. Please try again in a moment.",
+        { cause: "GATEWAY_ERROR", status: res.status },
+      );
+    }
+
+    // Any other inconclusive non-ok status
+    console.error(`[razorpay] Inconclusive status (${res.status}) checking order ${orderId}:`, errBody?.error);
+    throw new AppError(
+      "SERVICE_UNAVAILABLE",
+      "Payment service could not verify order status. Please try again shortly.",
+      { cause: "INCONCLUSIVE_STATUS", status: res.status },
+    );
+  }
+
+  const data = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!data?.id) {
+    throw new AppError(
+      "SERVICE_UNAVAILABLE",
+      "Invalid response received from payment gateway.",
+      { cause: "INVALID_GATEWAY_RESPONSE" },
+    );
+  }
+
+  return {
+    id: data.id as string,
+    amount: Number(data.amount),
+    currency: (data.currency as string) || "INR",
+    receipt: (data.receipt as string) || "",
+    status: (data.status as string) || "created",
+  };
+}
+
+/**
  * Constant-time payment signature verification for Razorpay Standard Checkout.
  * Signature payload is `${razorpay_order_id}|${razorpay_payment_id}`.
  */
@@ -185,22 +323,95 @@ export interface RazorpayPaymentDetails {
 
 /**
  * Fetch authoritative payment details from Razorpay API.
+ *
+ * Distinguishes between:
+ *  - Confirmed missing (HTTP 404 / 400) -> returns null
+ *  - Transient / Inconclusive gateway errors (429 / 5xx / network drop) -> throws AppError
  */
 export async function fetchRazorpayPayment(
   paymentId: string,
 ): Promise<RazorpayPaymentDetails | null> {
   const { keyId, keySecret } = getRazorpayConfig();
 
-  const res = await fetch(`${RAZORPAY_API_BASE}/payments/${encodeURIComponent(paymentId)}`, {
-    method: "GET",
-    headers: {
-      Authorization: basicAuthHeader(keyId, keySecret),
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${RAZORPAY_API_BASE}/payments/${encodeURIComponent(paymentId)}`, {
+      method: "GET",
+      headers: {
+        Authorization: basicAuthHeader(keyId, keySecret),
+      },
+    });
+  } catch (netErr) {
+    console.error(`[razorpay] Network failure while verifying payment ${paymentId}:`, netErr);
+    throw new AppError(
+      "SERVICE_UNAVAILABLE",
+      "Payment gateway is temporarily unreachable. Please try again shortly.",
+      { cause: "NETWORK_ERROR" },
+    );
+  }
 
   if (!res.ok) {
-    console.warn(`[razorpay] Failed to fetch payment ${paymentId}: ${res.status}`);
-    return null;
+    const errBody = (await res.json().catch(() => null)) as {
+      error?: { code?: string; description?: string };
+    } | null;
+    const errCode = (errBody?.error?.code || "").toUpperCase();
+    const errDesc = (errBody?.error?.description || "").toLowerCase();
+
+    if (res.status === 404) {
+      console.warn(`[razorpay] Payment ${paymentId} authoritatively confirmed nonexistent (404).`);
+      return null;
+    }
+
+    if (res.status === 400) {
+      const isConfirmedNonexistent =
+        errDesc.includes("does not exist") ||
+        errDesc.includes("payment not found") ||
+        errCode === "BAD_REQUEST_PAYMENT_NOT_FOUND" ||
+        errCode === "INVALID_PAYMENT_ID";
+
+      if (isConfirmedNonexistent) {
+        console.warn(`[razorpay] Payment ${paymentId} confirmed nonexistent (400): ${errDesc}`);
+        return null;
+      }
+
+      console.error(`[razorpay] Bad request error (400) checking payment ${paymentId}:`, errBody?.error);
+      throw new AppError(
+        "SERVICE_UNAVAILABLE",
+        "Payment service could not verify payment details. Please try again shortly.",
+        { cause: "INCONCLUSIVE_BAD_REQUEST", details: errBody?.error },
+      );
+    }
+
+    if (res.status === 401 || res.status === 403) {
+      throw new AppError(
+        "SERVER_ERROR",
+        "Payment gateway authentication failure. Please contact administrator.",
+        { cause: "AUTH_FAILURE", status: res.status },
+      );
+    }
+
+    if (res.status === 429) {
+      throw new AppError(
+        "RATE_LIMITED",
+        "Payment gateway rate limit reached. Please try again shortly.",
+        { cause: "RATE_LIMITED" },
+      );
+    }
+
+    if (res.status >= 500) {
+      console.error(`[razorpay] Upstream gateway error (${res.status}) checking payment ${paymentId}`);
+      throw new AppError(
+        "SERVICE_UNAVAILABLE",
+        "Payment gateway is temporarily experiencing issues. Please try again in a moment.",
+        { cause: "GATEWAY_ERROR", status: res.status },
+      );
+    }
+
+    throw new AppError(
+      "SERVICE_UNAVAILABLE",
+      "Payment service could not verify payment status. Please try again shortly.",
+      { cause: "INCONCLUSIVE_STATUS", status: res.status },
+    );
   }
 
   const data = (await res.json().catch(() => null)) as Record<string, unknown> | null;

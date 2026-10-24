@@ -7,6 +7,7 @@ import {
 } from "./index";
 import { uuid } from "../crypto";
 import { isInternshipMaintenance } from "@/config/features";
+import { AppError } from "../http";
 
 /**
  * Firestore-backed DataStore (Admin SDK) mapped to the REAL existing schema of
@@ -35,6 +36,166 @@ const WRITE = {
   applications: process.env.FIREBASE_WRITE_COLLECTION_APPLICATIONS ?? "ktt_applications",
   audit: process.env.FIREBASE_WRITE_COLLECTION_AUDIT ?? "ktt_audit_logs",
 };
+
+/**
+ * Prioritized collections for application lookups:
+ * 1. WRITE.applications (ktt_applications) — primary write collection for recent/current registrations
+ * 2. READ.applications (registrations) — production read collection for earlier registrations
+ * 3. "applications" — legacy collection fallback
+ * 4. "hackathon_registrations" — legacy hackathon collection fallback
+ * 5. "hack2skill" — legacy event collection fallback
+ * 6. "payments" — legacy payments collection fallback
+ */
+const CANDIDATE_APP_COLLECTIONS = [
+  WRITE.applications,
+  READ.applications,
+  "applications",
+  "hackathon_registrations",
+  "hack2skill",
+  "payments",
+];
+
+/**
+ * Detects if an error from Firestore / gRPC represents an infrastructure failure:
+ * - RESOURCE_EXHAUSTED / Quota exceeded (gRPC 8 / HTTP 429)
+ * - UNAVAILABLE / Service unavailable (gRPC 14 / HTTP 503)
+ * - DEADLINE_EXCEEDED / Timeout (gRPC 4 / HTTP 504)
+ * - PERMISSION_DENIED (gRPC 7 / HTTP 403)
+ */
+export function isFirestoreInfrastructureError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as { code?: unknown; status?: unknown; message?: unknown };
+  const code = e.code;
+  const status = typeof e.status === "string" ? e.status : "";
+  const msg = typeof e.message === "string" ? e.message : "";
+
+  // Quota exceeded (Spark limit hit / 429)
+  if (
+    code === 8 ||
+    code === "resource-exhausted" ||
+    code === 429 ||
+    status === "RESOURCE_EXHAUSTED" ||
+    msg.includes("Quota exceeded") ||
+    msg.includes("RESOURCE_EXHAUSTED")
+  ) {
+    return true;
+  }
+
+  // Unavailable / Backend unreachable (503)
+  if (
+    code === 14 ||
+    code === "unavailable" ||
+    code === 503 ||
+    status === "UNAVAILABLE" ||
+    msg.includes("UNAVAILABLE") ||
+    msg.includes("Service Unavailable") ||
+    msg.includes("backend is unreachable") ||
+    msg.includes("could not reach")
+  ) {
+    return true;
+  }
+
+  // Timeout / Deadline Exceeded (504)
+  if (
+    code === 4 ||
+    code === "deadline-exceeded" ||
+    status === "DEADLINE_EXCEEDED" ||
+    msg.includes("DEADLINE_EXCEEDED") ||
+    msg.includes("timeout") ||
+    msg.includes("ETIMEDOUT")
+  ) {
+    return true;
+  }
+
+  // Permission denied (403)
+  if (
+    code === 7 ||
+    code === "permission-denied" ||
+    status === "PERMISSION_DENIED" ||
+    msg.includes("PERMISSION_DENIED") ||
+    msg.includes("insufficient permissions")
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+export function handleFirestoreError(err: unknown, operationDescription: string): never {
+  const e = err as { code?: unknown; status?: unknown; message?: unknown };
+  const code = e?.code;
+  const status = typeof e?.status === "string" ? e.status : "";
+  const msg = typeof e?.message === "string" ? e.message : "";
+
+  console.error(`[firestore] ${operationDescription} failed:`, err);
+
+  if (
+    code === 8 ||
+    code === "resource-exhausted" ||
+    code === 429 ||
+    status === "RESOURCE_EXHAUSTED" ||
+    msg.includes("Quota exceeded") ||
+    msg.includes("RESOURCE_EXHAUSTED")
+  ) {
+    throw new AppError(
+      "SERVICE_UNAVAILABLE",
+      "Database service quota reached. Please try again shortly.",
+      { cause: "RESOURCE_EXHAUSTED" }
+    );
+  }
+
+  if (
+    code === 14 ||
+    code === "unavailable" ||
+    code === 503 ||
+    status === "UNAVAILABLE" ||
+    msg.includes("UNAVAILABLE") ||
+    msg.includes("Service Unavailable") ||
+    msg.includes("backend is unreachable") ||
+    msg.includes("could not reach")
+  ) {
+    throw new AppError(
+      "SERVICE_UNAVAILABLE",
+      "Database service is temporarily unavailable. Please try again in a moment.",
+      { cause: "UNAVAILABLE" }
+    );
+  }
+
+  if (
+    code === 4 ||
+    code === "deadline-exceeded" ||
+    status === "DEADLINE_EXCEEDED" ||
+    msg.includes("DEADLINE_EXCEEDED") ||
+    msg.includes("timeout") ||
+    msg.includes("ETIMEDOUT")
+  ) {
+    throw new AppError(
+      "SERVICE_UNAVAILABLE",
+      "Database request timed out. Please try again.",
+      { cause: "DEADLINE_EXCEEDED" }
+    );
+  }
+
+  if (
+    code === 7 ||
+    code === "permission-denied" ||
+    status === "PERMISSION_DENIED" ||
+    msg.includes("PERMISSION_DENIED") ||
+    msg.includes("insufficient permissions")
+  ) {
+    throw new AppError(
+      "SERVER_ERROR",
+      "Database permission error. Please contact administrator.",
+      { cause: "PERMISSION_DENIED" }
+    );
+  }
+
+  throw new AppError(
+    "SERVER_ERROR",
+    `Database operation failed: ${msg || "Unknown database error."}`,
+    { cause: "DATABASE_ERROR" }
+  );
+}
 
 type Doc = Record<string, unknown>;
 const str = (v: unknown): string => (typeof v === "string" ? v : v == null ? "" : String(v));
@@ -511,48 +672,33 @@ export function createFirebaseStore(): DataStore {
     async createApplication(record: ApplicationRecord) {
       invalidateApplicationsCache();
       const db = await getAdminDb();
-      await db.collection(WRITE.applications).doc(record.id).set(record);
-      return record;
+      try {
+        await db.collection(WRITE.applications).doc(record.id).set(record);
+        return record;
+      } catch (err) {
+        handleFirestoreError(err, `createApplication on ${WRITE.applications}`);
+      }
     },
     async getApplicationById(id: string) {
       const db = await getAdminDb();
-      const candidateCols = [
-        WRITE.applications,
-        READ.applications,
-        "applications",
-        "hackathon_registrations",
-        "hackathons",
-        "hackathon",
-        "hack2skill",
-        "payments",
-        "orders",
-        "event_registrations",
-      ];
-      for (const col of candidateCols) {
+      for (const col of CANDIDATE_APP_COLLECTIONS) {
         try {
           const doc = await db.collection(col).doc(id).get();
           if (doc.exists) {
             return mapLegacyApplication(doc.id, doc.data() as Doc);
           }
-        } catch {}
+        } catch (err) {
+          if (isFirestoreInfrastructureError(err) || col === WRITE.applications) {
+            handleFirestoreError(err, `getApplicationById on ${col}`);
+          }
+          console.warn(`[firestore] getApplicationById on fallback collection ${col} failed:`, (err as Error)?.message);
+        }
       }
       return null;
     },
     async getApplicationByAppId(applicationId: string) {
       const db = await getAdminDb();
-      const candidateCols = [
-        WRITE.applications,
-        READ.applications,
-        "applications",
-        "hackathon_registrations",
-        "hackathons",
-        "hackathon",
-        "hack2skill",
-        "payments",
-        "orders",
-        "event_registrations",
-      ];
-      for (const col of candidateCols) {
+      for (const col of CANDIDATE_APP_COLLECTIONS) {
         try {
           const snap = await db.collection(col).where("applicationId", "==", applicationId).limit(1).get();
           if (!snap.empty) {
@@ -562,49 +708,35 @@ export function createFirebaseStore(): DataStore {
           if (doc.exists) {
             return mapLegacyApplication(doc.id, doc.data() as Doc);
           }
-        } catch {}
+        } catch (err) {
+          if (isFirestoreInfrastructureError(err) || col === WRITE.applications) {
+            handleFirestoreError(err, `getApplicationByAppId on ${col}`);
+          }
+          console.warn(`[firestore] getApplicationByAppId on fallback collection ${col} failed:`, (err as Error)?.message);
+        }
       }
       return null;
     },
     async getApplicationByDedupeKey(dedupeKey: string) {
       const db = await getAdminDb();
-      const candidateCols = [
-        WRITE.applications,
-        READ.applications,
-        "applications",
-        "hackathon_registrations",
-        "hackathons",
-        "hackathon",
-        "hack2skill",
-        "payments",
-        "orders",
-        "event_registrations",
-      ];
-      for (const col of candidateCols) {
+      for (const col of CANDIDATE_APP_COLLECTIONS) {
         try {
           const snap = await db.collection(col).where("dedupeKey", "==", dedupeKey).limit(1).get();
           if (!snap.empty) {
             return mapLegacyApplication(snap.docs[0].id, snap.docs[0].data() as Doc);
           }
-        } catch {}
+        } catch (err) {
+          if (isFirestoreInfrastructureError(err) || col === WRITE.applications) {
+            handleFirestoreError(err, `getApplicationByDedupeKey on ${col}`);
+          }
+          console.warn(`[firestore] getApplicationByDedupeKey on fallback collection ${col} failed:`, (err as Error)?.message);
+        }
       }
       return null;
     },
     async getApplicationByRazorpayOrderId(orderId: string) {
       const db = await getAdminDb();
-      const candidateCols = [
-        WRITE.applications,
-        READ.applications,
-        "applications",
-        "hackathon_registrations",
-        "hackathons",
-        "hackathon",
-        "hack2skill",
-        "payments",
-        "orders",
-        "event_registrations",
-      ];
-      for (const col of candidateCols) {
+      for (const col of CANDIDATE_APP_COLLECTIONS) {
         try {
           for (const field of ["razorpayOrderId", "razorpay_order_id", "orderId"]) {
             const snap = await db.collection(col).where(field, "==", orderId).limit(1).get();
@@ -612,7 +744,12 @@ export function createFirebaseStore(): DataStore {
               return mapLegacyApplication(snap.docs[0].id, snap.docs[0].data() as Doc);
             }
           }
-        } catch {}
+        } catch (err) {
+          if (isFirestoreInfrastructureError(err) || col === WRITE.applications) {
+            handleFirestoreError(err, `getApplicationByRazorpayOrderId on ${col}`);
+          }
+          console.warn(`[firestore] getApplicationByRazorpayOrderId on fallback collection ${col} failed:`, (err as Error)?.message);
+        }
       }
       return null;
     },
@@ -781,12 +918,16 @@ export function createFirebaseStore(): DataStore {
     async updateApplication(id: string, patch: Partial<ApplicationRecord>) {
       invalidateApplicationsCache();
       const db = await getAdminDb();
-      const ref = db.collection(WRITE.applications).doc(id);
-      await ref.set(patch, { merge: true });
-      const doc = await ref.get();
-      if (!doc.exists) return null;
-      const d = doc.data() as ApplicationRecord;
-      return { ...d, id: doc.id, teamName: d.teamName || d.schoolName };
+      try {
+        const ref = db.collection(WRITE.applications).doc(id);
+        await ref.set(patch, { merge: true });
+        const doc = await ref.get();
+        if (!doc.exists) return null;
+        const d = doc.data() as ApplicationRecord;
+        return { ...d, id: doc.id, teamName: d.teamName || d.schoolName };
+      } catch (err) {
+        handleFirestoreError(err, `updateApplication on ${WRITE.applications}`);
+      }
     },
 
     // ---- audit — WRITE namespaced ----------------------------------------
