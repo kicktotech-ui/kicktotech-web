@@ -5,8 +5,8 @@ import { permissionsFor, isAdminRole } from "@/server/rbac";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export const GET = route(async (_req, { requestId }) => {
-  const ctx = await readSession("admin");
+export const GET = route(async (req, { requestId }) => {
+  const ctx = await readSession("admin", req);
   if (!ctx || ctx.user.type !== "admin" || !isAdminRole(ctx.user.role)) {
     return ok({ user: null, permissions: [] }, { requestId });
   }

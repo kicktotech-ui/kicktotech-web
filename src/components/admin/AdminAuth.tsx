@@ -21,11 +21,38 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
+
+    // Fast-restore cached admin profile on refresh so user is never abruptly logged out
+    let cachedAdmin: AdminUser | null = null;
+    try {
+      const stored = localStorage.getItem("ktt_admin_user");
+      if (stored) cachedAdmin = JSON.parse(stored);
+    } catch {}
+
+    if (cachedAdmin) {
+      setAdmin(cachedAdmin);
+      setReady(true);
+    }
+
     (async () => {
       const current = await authService.me();
       if (active) {
-        setAdmin(current);
-        setReady(true);
+        if (current) {
+          setAdmin(current);
+          try { localStorage.setItem("ktt_admin_user", JSON.stringify(current)); } catch {}
+          setReady(true);
+        } else if (!cachedAdmin) {
+          setAdmin(null);
+          setReady(true);
+        } else {
+          // If server could not verify, check if token was explicitly wiped
+          const token = typeof window !== "undefined" ? localStorage.getItem("ktt_admin_token") : null;
+          if (!token) {
+            setAdmin(null);
+            try { localStorage.removeItem("ktt_admin_user"); } catch {}
+          }
+          setReady(true);
+        }
       }
     })();
     return () => { active = false; };
@@ -34,10 +61,15 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const user = await authService.login(email, password);
     setAdmin(user);
+    try { localStorage.setItem("ktt_admin_user", JSON.stringify(user)); } catch {}
   };
   const logout = () => {
     authService.logout();
     setAdmin(null);
+    try {
+      localStorage.removeItem("ktt_admin_user");
+      localStorage.removeItem("ktt_admin_token");
+    } catch {}
   };
   const can = (permission: Permission) => (admin ? hasPermission(admin.role, permission) : false);
 

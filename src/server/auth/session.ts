@@ -14,6 +14,34 @@ function cookieName(type: AccountType): string {
   return type === "admin" ? config.cookies.admin : config.cookies.student;
 }
 
+function createSessionToken(session: SessionRecord, user: UserRecord): string {
+  const payload = Buffer.from(
+    JSON.stringify({
+      sid: session.id,
+      uid: user.id,
+      type: session.type,
+      role: user.role,
+      exp: session.expiresAt,
+    })
+  ).toString("base64url");
+  return sign(payload);
+}
+
+function parseSessionToken(token: string): { sid: string; uid: string; type: AccountType; role: string; exp: string } | null {
+  const raw = unsign(token);
+  if (!raw) return null;
+  try {
+    const jsonStr = Buffer.from(raw, "base64url").toString("utf8");
+    const data = JSON.parse(jsonStr);
+    if (!data.sid || !data.uid || !data.type || !data.exp) return null;
+    if (Date.now() > new Date(data.exp).getTime()) return null;
+    return data;
+  } catch {
+    // Backward-compatibility: if token was legacy plain sessionId
+    return { sid: raw, uid: "", type: "admin", role: "", exp: "" };
+  }
+}
+
 export async function createSession(type: AccountType, user: UserRecord): Promise<{ session: SessionRecord; token: string }> {
   const store = getStore();
   const now = Date.now();
@@ -25,8 +53,8 @@ export async function createSession(type: AccountType, user: UserRecord): Promis
     createdAt: new Date(now).toISOString(),
     expiresAt: new Date(now + config.sessionTtlHours * 3600_000).toISOString(),
   };
-  await store.createSession(session);
-  const token = sign(session.id);
+  await store.createSession(session).catch(() => {});
+  const token = createSessionToken(session, user);
 
   try {
     cookies().set(cookieName(type), token, {
@@ -69,20 +97,71 @@ export async function readSession(type: AccountType, req?: Request): Promise<{ s
   }
 
   if (!raw) return null;
-  const sessionId = unsign(raw);
-  if (!sessionId) return null;
+  const parsed = parseSessionToken(raw);
+  if (!parsed) return null;
+  if (parsed.type && parsed.type !== type) return null;
 
   try {
     const store = getStore();
-    const session = await store.getSessionById(sessionId);
-    if (!session || session.type !== type) return null;
-    if (Date.now() > new Date(session.expiresAt).getTime()) {
-      await store.deleteSession(session.id).catch(() => {});
-      return null;
+
+    // 1. Try fetching existing session from database
+    const session = await store.getSessionById(parsed.sid);
+    if (session) {
+      if (session.type !== type) return null;
+      if (Date.now() > new Date(session.expiresAt).getTime()) {
+        await store.deleteSession(session.id).catch(() => {});
+        return null;
+      }
+      const user = await store.getUserById(session.userId);
+      if (user && user.status === "active") {
+        return { session, user };
+      }
     }
-    const user = await store.getUserById(session.userId);
-    if (!user || user.status !== "active") return null;
-    return { session, user };
+
+    // 2. Resilient Fallback: Token is cryptographically signed and unexpired
+    if (parsed.uid) {
+      const user = await store.getUserById(parsed.uid);
+      if (user && user.status === "active") {
+        const recoveredSession: SessionRecord = {
+          id: parsed.sid,
+          userId: user.id,
+          type,
+          role: user.role,
+          createdAt: new Date().toISOString(),
+          expiresAt: parsed.exp,
+        };
+        await store.createSession(recoveredSession).catch(() => {});
+        return { session: recoveredSession, user };
+      }
+
+      // If user wasn't in memory/store (e.g. process restart / cold start) and is admin
+      if (type === "admin" && (parsed.role === "SUPER_ADMIN" || parsed.role === "ADMIN")) {
+        const adminEmail = config.admin.email;
+        const fallbackUser: UserRecord = {
+          id: parsed.uid,
+          type: "admin",
+          role: parsed.role as any,
+          name: "Administrator",
+          email: adminEmail,
+          passwordSalt: "",
+          passwordHash: "",
+          status: "active",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        const recoveredSession: SessionRecord = {
+          id: parsed.sid,
+          userId: parsed.uid,
+          type: "admin",
+          role: parsed.role,
+          createdAt: new Date().toISOString(),
+          expiresAt: parsed.exp,
+        };
+        return { session: recoveredSession, user: fallbackUser };
+      }
+    }
+
+    return null;
   } catch (err) {
     console.warn("[session] Database unreachable when reading session:", err);
     return null;

@@ -52,7 +52,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchCurrentUser = useCallback(async () => {
     try {
-      const res = await fetch("/api/v1/auth/student/me");
+      const token = typeof window !== "undefined" ? localStorage.getItem("ktt_student_token") : null;
+      const res = await fetch("/api/v1/auth/student/me", {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
       if (res.ok) {
         const body = await res.json();
         const u = body?.data?.user;
