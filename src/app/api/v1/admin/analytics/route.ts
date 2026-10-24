@@ -35,6 +35,7 @@ export const GET = route(async (req, { requestId }) => {
     console.warn("[analytics] count aggregate warning:", err);
   }
 
+  const isMongo = Boolean(process.env.MONGODB_URI);
   const data: DashboardData = {
     metrics: [
       { key: "interns", label: "Total interns", value: interns, format: "number", changePct: 0, trend: [] },
@@ -52,6 +53,10 @@ export const GET = route(async (req, { requestId }) => {
       { label: "Interns", value: interns },
       { label: "Certified", value: certsTotal },
     ],
+    dbConnected: isMongo,
+    dbMessage: isMongo
+      ? `Connected to MongoDB Atlas (${interns} interns / ${certsTotal} certificates)`
+      : "Running in memory mode. Set MONGODB_URI in Render Environment Variables to sync real database.",
   };
   return ok<DashboardData>(data, { requestId });
 });

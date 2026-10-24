@@ -298,6 +298,8 @@ export interface DashboardData {
   revenueTrend: TrendPoint[];
   domainDistribution: { domainId: DomainSlug; label: string; value: number; accent: string }[];
   funnel: { label: string; value: number }[];
+  dbConnected?: boolean;
+  dbMessage?: string;
 }
 
 export interface SystemService {

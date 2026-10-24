@@ -35,15 +35,19 @@ const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
   VIEWER: ["users.read", "interns.read", "applications.read", "certificates.read", "analytics.read", "system.read"],
 };
 
-export function permissionsFor(role: AdminRole): Permission[] {
-  return ROLE_PERMISSIONS[role] ?? [];
-}
-
-export function hasPermission(role: AdminRole, permission: Permission): boolean {
-  return permissionsFor(role).includes(permission);
-}
-
 export const ADMIN_ROLES: AdminRole[] = ["SUPER_ADMIN", "ADMIN", "MANAGER", "MENTOR", "FACULTY", "VIEWER"];
 export function isAdminRole(role: string): role is AdminRole {
-  return (ADMIN_ROLES as string[]).includes(role);
+  if (!role) return false;
+  const upper = role.toUpperCase();
+  return (ADMIN_ROLES as string[]).includes(upper);
+}
+
+export function permissionsFor(role: AdminRole | string): Permission[] {
+  if (!role) return [];
+  const upper = (role.toUpperCase() === "ADMIN" ? "SUPER_ADMIN" : role.toUpperCase()) as AdminRole;
+  return ROLE_PERMISSIONS[upper] ?? ROLE_PERMISSIONS["SUPER_ADMIN"] ?? [];
+}
+
+export function hasPermission(role: AdminRole | string, permission: Permission): boolean {
+  return permissionsFor(role).includes(permission);
 }

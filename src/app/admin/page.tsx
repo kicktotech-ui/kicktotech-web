@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus, CalendarPlus, Megaphone, Award, BarChart3, Activity as ActivityIcon, ArrowRight, CheckCircle2, RefreshCw } from "lucide-react";
+import { UserPlus, CalendarPlus, Megaphone, Award, BarChart3, Activity as ActivityIcon, ArrowRight, CheckCircle2, RefreshCw, AlertTriangle, Database } from "lucide-react";
 import { Button, Card, Badge, Skeleton, EmptyState, statusTone } from "@/components/admin/ui";
 import { StatCard, ChartCard, BarList } from "@/components/admin/charts";
 import { analyticsService, activityService } from "@/services/admin";
@@ -72,6 +72,20 @@ export default function AdminDashboardPage() {
           <Button variant="secondary" onClick={() => router.push("/admin/certification")}><Award className="h-4 w-4" /> Certificates</Button>
         </div>
       </div>
+
+      {/* MongoDB Connection Warning Banner */}
+      {dashboard && dashboard.dbConnected === false && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-900 dark:text-amber-200">
+          <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-500" />
+          <div>
+            <p className="text-sm font-bold">MongoDB Atlas Connection Missing</p>
+            <p className="mt-1 text-xs leading-relaxed text-amber-800 dark:text-amber-300">
+              The server is running in temporary in-memory mode because <code>MONGODB_URI</code> is not set in Render environment variables.
+              Set <code>MONGODB_URI</code> and <code>MONGODB_DB_NAME</code> in Render Dashboard to view all 13 users and live metrics.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Metrics + charts */}
       {conn === "loading" ? (
