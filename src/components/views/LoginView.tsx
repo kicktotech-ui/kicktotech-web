@@ -33,7 +33,7 @@ export function LoginView() {
   const redirect =
     rawRedirect && rawRedirect.startsWith("/") && !rawRedirect.startsWith("//")
       ? rawRedirect
-      : "/internship/dashboard";
+      : "/hackathon/register";
   const { refresh } = useAuth();
 
   const [email, setEmail] = useState("");

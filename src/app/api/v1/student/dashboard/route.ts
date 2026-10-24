@@ -40,9 +40,15 @@ export const GET = route(async (req, { requestId }) => {
   );
 
   // 3. Separate Hackathon vs Internship applications
-  const hackathonApps = studentApps.filter((a) =>
-    isHackathonRecord(a as unknown as Record<string, unknown>),
-  );
+  // Sort hackathons: confirmed/verified first, then newest first
+  const hackathonApps = studentApps
+    .filter((a) => isHackathonRecord(a as unknown as Record<string, unknown>))
+    .sort((a, b) => {
+      const aVerified = a.status === "PAYMENT_VERIFIED" || a.status === "CERTIFICATE_ISSUED" ? 1 : 0;
+      const bVerified = b.status === "PAYMENT_VERIFIED" || b.status === "CERTIFICATE_ISSUED" ? 1 : 0;
+      if (aVerified !== bVerified) return bVerified - aVerified;
+      return (b.createdAt || "").localeCompare(a.createdAt || "");
+    });
   const internshipApps = studentApps.filter(
     (a) => !isHackathonRecord(a as unknown as Record<string, unknown>),
   );
@@ -74,6 +80,11 @@ export const GET = route(async (req, { requestId }) => {
     };
   }
 
+  // A student is only officially enrolled in the hackathon when payment is verified
+  const isHackathonConfirmed = hackathonRecord
+    ? hackathonRecord.status === "PAYMENT_VERIFIED" || hackathonRecord.status === "CERTIFICATE_ISSUED"
+    : false;
+
   const liveConfig = await getHackathonDashboardConfig();
 
   return ok(
@@ -84,7 +95,8 @@ export const GET = route(async (req, { requestId }) => {
         name: authUser.name,
       },
       hackathon: {
-        enrolled: Boolean(hackathonRecord),
+        enrolled: isHackathonConfirmed,
+        isPendingPayment: Boolean(hackathonRecord && !isHackathonConfirmed),
         registration: hackathonRecord,
         config: liveConfig,
       },

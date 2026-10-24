@@ -53,6 +53,7 @@ interface StudentDashboardResponse {
   user: { id: string; email: string; name?: string };
   hackathon: {
     enrolled: boolean;
+    isPendingPayment?: boolean;
     registration: HackathonParticipantRecord | null;
     config: HackathonDashboardConfig;
   };
@@ -121,6 +122,8 @@ function DashboardContent() {
             setActiveTab("hackathon");
           } else if (res.internship.enrolled && !res.hackathon.enrolled) {
             setActiveTab("internship");
+          } else if (res.hackathon.isPendingPayment) {
+            setActiveTab("hackathon");
           } else {
             setActiveTab(requestedTab === "internship" ? "internship" : "hackathon");
           }
@@ -166,8 +169,11 @@ function DashboardContent() {
     setTimeout(() => setCopiedId(false), 2000);
   }
 
-  const hackathonEnrolled = Boolean(data?.hackathon.enrolled);
   const hackathonReg = data?.hackathon.registration;
+  const isHackathonVerified =
+    hackathonReg?.status === "PAYMENT_VERIFIED" || hackathonReg?.status === "CERTIFICATE_ISSUED";
+  const isHackathonPending = Boolean(hackathonReg && !isHackathonVerified);
+  const hackathonEnrolled = Boolean(data?.hackathon.enrolled && isHackathonVerified);
   const hackathonConfig = data?.hackathon.config;
   const internshipEnrolled = Boolean(data?.internship.enrolled);
 
@@ -177,10 +183,16 @@ function DashboardContent() {
         title={`Welcome, ${user?.name ?? "there"}`}
         subtitle="Your personalized student & participant hub."
         action={
-          activeTab === "hackathon" && !hackathonEnrolled ? (
-            <Button href="/hackathon/register" size="sm">
-              <Trophy className="mr-1.5 h-4 w-4" /> Register for Hackathon
-            </Button>
+          activeTab === "hackathon" && !isHackathonVerified ? (
+            isHackathonPending ? (
+              <Button href="/hackathon/register" size="sm" className="bg-gradient-to-r from-amber-500 to-amber-400 text-ink-900 font-bold hover:brightness-105 shadow-md shadow-amber-500/20">
+                <CreditCard className="mr-1.5 h-4 w-4" /> Pay ₹99 to Confirm
+              </Button>
+            ) : (
+              <Button href="/hackathon/register" size="sm">
+                <Trophy className="mr-1.5 h-4 w-4" /> Register for Hackathon
+              </Button>
+            )
           ) : activeTab === "internship" && !internshipEnrolled ? (
             <Button href="/internship/register" size="sm">
               <BookOpen className="mr-1.5 h-4 w-4" /> Enroll in a Domain
@@ -217,10 +229,15 @@ function DashboardContent() {
               <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-accent">
                 <Trophy className="h-4 w-4" /> Hackathon Participation
               </span>
-              {hackathonEnrolled ? (
+              {isHackathonVerified ? (
                 <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2.5 py-0.5 text-xs font-bold text-emerald-300">
                   <CheckCircle2 className="h-3 w-3" />
                   {hackathonReg?.kttId ? `Enrolled • ${hackathonReg.kttId}` : "Enrolled"}
+                </span>
+              ) : isHackathonPending ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/40 bg-amber-400/10 px-2.5 py-0.5 text-xs font-bold text-amber-300">
+                  <Clock className="h-3 w-3" />
+                  Payment Pending
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 rounded-full border border-line bg-ink-900 px-2.5 py-0.5 text-[11px] text-muted">
@@ -234,9 +251,11 @@ function DashboardContent() {
                 {hackathonConfig?.eventName || "PromptWars × KICK To TECH"}
               </p>
               <p className="mt-1 text-xs text-muted">
-                {hackathonEnrolled
-                  ? `Status: ${hackathonReg?.status === "PAYMENT_VERIFIED" || hackathonReg?.status === "CERTIFICATE_ISSUED" ? "Verified & Paid" : "Payment Pending"} • 28 Oct 2026`
-                  : "Build with AI • ₹30,000 Prize Pool • ₹99 Kit Fee"}
+                {isHackathonVerified
+                  ? "Status: Verified & Confirmed • 28 Oct 2026"
+                  : isHackathonPending
+                    ? "Status: Payment Pending (₹99 Required) • 28 Oct 2026"
+                    : "Build with AI • ₹30,000 Prize Pool • ₹99 Kit Fee"}
               </p>
             </div>
           </div>
@@ -316,8 +335,8 @@ function DashboardContent() {
       {/* SECTION 1: HACKATHON PARTICIPANTS */}
       {activeTab === "hackathon" && (
         <div className="space-y-6">
-          {/* If Enrolled: Official Participant Pass Card */}
-          {hackathonEnrolled && hackathonReg ? (
+          {/* If Enrolled & Verified: Official Participant Pass Card */}
+          {isHackathonVerified && hackathonReg ? (
             <div className="relative overflow-hidden rounded-3xl border border-accent/40 bg-gradient-to-br from-accent/15 via-surface to-ink-900 p-6 shadow-xl sm:p-8">
               <div
                 aria-hidden
@@ -378,16 +397,9 @@ function DashboardContent() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {hackathonReg.status === "PAYMENT_VERIFIED" ||
-                    hackathonReg.status === "CERTIFICATE_ISSUED" ? (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-xs font-bold text-emerald-400">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Verified & Confirmed
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-xs font-bold text-amber-400">
-                        <AlertCircle className="h-3.5 w-3.5" /> {hackathonReg.status}
-                      </span>
-                    )}
+                    <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-xs font-bold text-emerald-400">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Verified & Confirmed
+                    </span>
                   </div>
                 </div>
               </div>
@@ -400,6 +412,96 @@ function DashboardContent() {
                 </span>
                 <span className="text-muted">
                   Application Ref: <code className="font-mono text-accent">{hackathonReg.applicationId}</code>
+                </span>
+              </div>
+            </div>
+          ) : isHackathonPending && hackathonReg ? (
+            /* If Registration is in PAYMENT_PENDING: Actionable Pending Card */
+            <div className="relative overflow-hidden rounded-3xl border border-amber-500/40 bg-gradient-to-br from-amber-500/10 via-surface to-ink-900 p-6 shadow-xl sm:p-8">
+              <div
+                aria-hidden
+                className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-amber-500/15 blur-3xl"
+              />
+
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/15 px-3 py-1 text-xs font-bold text-amber-300">
+                      <Clock className="h-3.5 w-3.5" /> Registration Pending Payment
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full border border-line px-3 py-1 text-xs font-medium text-muted">
+                      PromptWars 2026
+                    </span>
+                  </div>
+
+                  <h2 className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl text-primary-foreground">
+                    {hackathonReg.name || user?.name}
+                  </h2>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-y-2 gap-x-4 text-xs text-muted">
+                    {hackathonReg.college && (
+                      <span className="flex items-center gap-1">
+                        <MapPin className="h-3.5 w-3.5 text-amber-400" /> {hackathonReg.college}
+                      </span>
+                    )}
+                    {hackathonReg.teamName && (
+                      <span className="flex items-center gap-1 font-semibold text-primary-foreground/90">
+                        <Users className="h-3.5 w-3.5 text-amber-400" /> Team: {hackathonReg.teamName}
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3.5 w-3.5 text-amber-400" /> Applied: {formatDate(hackathonReg.createdAt)}
+                    </span>
+                  </div>
+
+                  <p className="mt-3 text-xs sm:text-sm text-amber-200/90 max-w-xl">
+                    Your registration application has been received! Complete the ₹99 Participant Kit & Refreshment Fee to lock in your confirmed seat and receive your official Unique Participant ID (KTT#).
+                  </p>
+                </div>
+
+                {/* Application Reference & Pay Action */}
+                <div className="flex flex-col items-start gap-3 rounded-2xl border border-amber-500/30 bg-ink-800/80 p-5 sm:items-end lg:min-w-[260px]">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+                    Application Reference
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xl sm:text-2xl font-black text-amber-300 tracking-wider">
+                      {hackathonReg.applicationId}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyKttId(hackathonReg.applicationId)}
+                      title="Copy Application ID"
+                      className="rounded-lg border border-amber-500/30 p-1.5 text-amber-300 hover:bg-amber-500/10 transition-colors"
+                    >
+                      {copiedId ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-xs font-bold text-amber-400">
+                      <AlertCircle className="h-3.5 w-3.5" /> Payment Pending (₹99)
+                    </span>
+                  </div>
+
+                  <Button
+                    href="/hackathon/register"
+                    size="sm"
+                    className="mt-2 w-full bg-gradient-to-r from-amber-500 to-amber-400 text-ink-900 font-bold hover:brightness-105 shadow-lg shadow-amber-500/20"
+                  >
+                    <CreditCard className="mr-1.5 h-4 w-4" /> Pay ₹99 to Confirm
+                  </Button>
+                </div>
+              </div>
+
+              {/* Fee & Inclusions Banner */}
+              <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-amber-500/20 pt-4 text-xs">
+                <span className="text-muted">
+                  Participant Kit & Refreshment:{" "}
+                  <strong className="text-amber-400 font-bold">Pending Payment (₹99 Required)</strong>
+                </span>
+                <span className="text-muted">
+                  Status: <span className="font-mono text-amber-300 font-semibold">{hackathonReg.status}</span>
                 </span>
               </div>
             </div>

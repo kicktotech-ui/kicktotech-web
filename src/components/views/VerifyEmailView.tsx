@@ -95,11 +95,11 @@ export function VerifyEmailView() {
     return () => window.removeEventListener("focus", onFocus);
   }, [verified, checkVerification]);
 
-  // Redirect to dashboard after verification success
+  // Redirect to hackathon registration after verification success
   useEffect(() => {
     if (!verified) return;
     const timer = setTimeout(() => {
-      router.push("/internship/dashboard");
+      router.push("/hackathon/register");
     }, 2500);
     return () => clearTimeout(timer);
   }, [verified, router]);
@@ -178,7 +178,7 @@ export function VerifyEmailView() {
             </p>
           )}
           <p className="mt-4 text-xs text-muted">
-            Redirecting to your dashboard…
+            Redirecting to hackathon registration…
           </p>
           <Loader2 className="mt-2 h-4 w-4 animate-spin text-accent" />
         </div>

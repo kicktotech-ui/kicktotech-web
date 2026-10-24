@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import {
   Check, Loader2, ArrowRight, ArrowLeft, ShieldCheck,
   CreditCard, AlertCircle, ExternalLink, CheckCircle2, RefreshCw,
-  LayoutDashboard,
+  LayoutDashboard, Clock,
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/components/providers";
@@ -77,8 +77,9 @@ export function Hack2SkillRegisterFlow() {
     loadRazorpayScript();
   }, []);
 
-  // Pre-fill fields from authenticated profile
+  // Pre-fill fields from authenticated profile & existing application
   useEffect(() => {
+    let active = true;
     if (user) {
       setPersonal((p) => ({
         name: p.name || user.name || "",
@@ -91,8 +92,76 @@ export function Hack2SkillRegisterFlow() {
           college: a.college || user.college || "",
         }));
       }
+
+      async function checkExistingRegistration() {
+        try {
+          const token = firebaseUser ? await firebaseUser.getIdToken() : undefined;
+          const headers: Record<string, string> = {};
+          if (token) headers["Authorization"] = `Bearer ${token}`;
+          const res = await api.get<{
+            hackathon?: {
+              enrolled?: boolean;
+              registration?: {
+                id: string;
+                applicationId: string;
+                kttId?: string;
+                name?: string;
+                email?: string;
+                phone?: string;
+                college?: string;
+                course?: string;
+                year?: string;
+                teamName?: string;
+                status?: string;
+              } | null;
+            };
+          }>("/student/dashboard", { headers });
+
+          if (!active) return;
+          const reg = res?.hackathon?.registration;
+          if (reg) {
+            if (reg.name) setPersonal((p) => ({ ...p, name: reg.name || p.name }));
+            if (reg.phone) setPersonal((p) => ({ ...p, phone: reg.phone || p.phone }));
+            if (reg.college) {
+              setAcademic((a) => ({
+                ...a,
+                college: reg.college || a.college,
+                course: reg.course || a.course,
+                year: reg.year || a.year,
+                teamName: reg.teamName || a.teamName,
+              }));
+            }
+
+            if (reg.status === "PAYMENT_VERIFIED" || reg.status === "CERTIFICATE_ISSUED") {
+              setApplied({
+                applicationId: reg.applicationId,
+                status: reg.status,
+                duplicate: true,
+              });
+              setPhase("confirmed");
+            } else if (reg.status === "PAYMENT_PENDING") {
+              setApplied({
+                applicationId: reg.applicationId,
+                status: reg.status,
+                duplicate: true,
+              });
+              if (reg.college) {
+                setStep(2);
+              }
+            }
+          }
+        } catch {
+          // ignore error and let student proceed with normal flow
+        }
+      }
+
+      checkExistingRegistration();
     }
-  }, [user]);
+
+    return () => {
+      active = false;
+    };
+  }, [user, firebaseUser]);
 
   const markTouched = (key: string) => setTouched((t) => ({ ...t, [key]: true }));
 
@@ -450,7 +519,29 @@ export function Hack2SkillRegisterFlow() {
 
               {step === 2 && (
                 <div className="space-y-4">
-                  <h2 className="text-xl font-bold">Review your registration</h2>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-bold">Review your registration</h2>
+                    {applied?.applicationId && (
+                      <span className="font-mono text-xs text-accent">
+                        Ref: {applied.applicationId}
+                      </span>
+                    )}
+                  </div>
+
+                  {applied?.status === "PAYMENT_PENDING" && (
+                    <div className="flex items-start gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-xs sm:text-sm text-amber-200">
+                      <AlertCircle className="h-5 w-5 flex-shrink-0 text-amber-400 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-amber-300">
+                          Application Saved • Payment Pending
+                        </p>
+                        <p className="mt-0.5 text-xs text-amber-200/80">
+                          Complete the ₹99 Participant Kit & Refreshment Fee below to confirm your seat and receive your Unique Participant ID.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   <dl className="divide-y divide-line rounded-2xl border border-line">
                     {[
                       ["Name", personal.name],
