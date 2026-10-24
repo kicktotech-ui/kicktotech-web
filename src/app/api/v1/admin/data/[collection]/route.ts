@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
  * GET /api/v1/admin/data/:collection?search&page&pageSize&status&domain&payment&type&id
  */
 export const GET = route(async (req, { requestId, params }) => {
-  await requireAdmin("users.read");
+  await requireAdmin("users.read", req);
   const name = params?.collection ?? "";
   const url = new URL(req.url);
   const id = url.searchParams.get("id") ?? undefined;

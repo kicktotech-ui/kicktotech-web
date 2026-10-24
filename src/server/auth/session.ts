@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { config } from "../config";
 import { sign, unsign } from "../crypto";
 import { getStore, type AccountType, type UserRecord, type SessionRecord } from "../data";
@@ -6,15 +6,15 @@ import { getStore, type AccountType, type UserRecord, type SessionRecord } from 
 /**
  * Server-side sessions. The cookie holds only a signed session id (HMAC). The
  * session record lives in the DataStore so it can be revoked on logout. Cookies
- * are HTTP-only, SameSite=Lax, Secure in production. No credentials or roles
- * are trusted from the cookie itself.
+ * are HTTP-only, SameSite=Lax, Secure in production. We also accept Authorization:
+ * Bearer <signedToken> for resilient cross-environment authentication.
  */
 
 function cookieName(type: AccountType): string {
   return type === "admin" ? config.cookies.admin : config.cookies.student;
 }
 
-export async function createSession(type: AccountType, user: UserRecord): Promise<SessionRecord> {
+export async function createSession(type: AccountType, user: UserRecord): Promise<{ session: SessionRecord; token: string }> {
   const store = getStore();
   const now = Date.now();
   const session: SessionRecord = {
@@ -26,28 +26,48 @@ export async function createSession(type: AccountType, user: UserRecord): Promis
     expiresAt: new Date(now + config.sessionTtlHours * 3600_000).toISOString(),
   };
   await store.createSession(session);
+  const token = sign(session.id);
 
   try {
-    cookies().set(cookieName(type), sign(session.id), {
+    cookies().set(cookieName(type), token, {
       httpOnly: true,
       sameSite: "lax",
       secure: config.cookieSecure,
       path: "/",
       maxAge: config.sessionTtlHours * 3600,
     });
-  } catch {
-    // Outside request scope (e.g. CLI / tests)
+  } catch (err) {
+    console.warn("[session] Failed to set cookie (falling back to bearer token):", err);
   }
-  return session;
+  return { session, token };
 }
 
-export async function readSession(type: AccountType): Promise<{ session: SessionRecord; user: UserRecord } | null> {
+export async function readSession(type: AccountType, req?: Request): Promise<{ session: SessionRecord; user: UserRecord } | null> {
   let raw: string | undefined;
+
+  // 1. Try Cookie
   try {
     raw = cookies().get(cookieName(type))?.value;
   } catch {
-    return null;
+    // Outside cookie context
   }
+
+  // 2. Try Authorization Bearer Header or custom token header fallback
+  if (!raw) {
+    try {
+      const h = req ? req.headers : headers();
+      const authHeader = h.get("authorization") || h.get("Authorization");
+      if (authHeader?.startsWith("Bearer ")) {
+        raw = authHeader.substring(7).trim();
+      }
+      if (!raw) {
+        raw = h.get("x-admin-token") || h.get("x-session-token") || undefined;
+      }
+    } catch {
+      // Outside headers context
+    }
+  }
+
   if (!raw) return null;
   const sessionId = unsign(raw);
   if (!sessionId) return null;

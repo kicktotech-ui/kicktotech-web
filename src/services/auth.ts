@@ -54,8 +54,11 @@ function toProfile(u: ApiUser): Profile {
 const realAuthService: AuthService = {
   async login(email, password) {
     try {
-      const { user } = await api.post<{ user: ApiUser }>("/auth/student/login", { email, password });
-      return { user: toProfile(user) };
+      const res = await api.post<{ user: ApiUser; token?: string }>("/auth/student/login", { email, password });
+      if (res.token && typeof window !== "undefined") {
+        try { localStorage.setItem("ktt_student_token", res.token); } catch {}
+      }
+      return { user: toProfile(res.user) };
     } catch (e) {
       return { user: null, error: e instanceof ApiError ? e.message : "Login failed. Please try again." };
     }
@@ -63,8 +66,11 @@ const realAuthService: AuthService = {
 
   async signup(input) {
     try {
-      const { user } = await api.post<{ user: ApiUser }>("/auth/student/register", input);
-      return { user: toProfile(user) };
+      const res = await api.post<{ user: ApiUser; token?: string }>("/auth/student/register", input);
+      if (res.token && typeof window !== "undefined") {
+        try { localStorage.setItem("ktt_student_token", res.token); } catch {}
+      }
+      return { user: toProfile(res.user) };
     } catch (e) {
       return { user: null, error: e instanceof ApiError ? e.message : "Could not create account." };
     }
@@ -75,6 +81,9 @@ const realAuthService: AuthService = {
       await api.post("/auth/student/logout");
     } catch {
       /* best-effort; cookie is cleared server-side */
+    }
+    if (typeof window !== "undefined") {
+      try { localStorage.removeItem("ktt_student_token"); } catch {}
     }
   },
 

@@ -10,6 +10,6 @@ export const POST = route(async (req, { requestId }) => {
   const ip = clientIp(req);
   rateLimit(`register:${ip}`);
   const input = await parseJson(req, studentRegisterSchema);
-  const user = await registerStudent(input, { ip, requestId });
-  return ok({ user }, { status: 201, requestId });
+  const result = await registerStudent(input, { ip, requestId });
+  return ok({ user: result, token: result.token }, { status: 201, requestId });
 });

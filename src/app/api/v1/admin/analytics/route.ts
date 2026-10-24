@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
 /**
  * Real dashboard analytics computed from the database.
  */
-export const GET = route(async (_req, { requestId }) => {
-  await requireAdmin("analytics.read");
+export const GET = route(async (req, { requestId }) => {
+  await requireAdmin("analytics.read", req);
   const store = getStore();
 
   const domainAccents: Record<string, string> = {

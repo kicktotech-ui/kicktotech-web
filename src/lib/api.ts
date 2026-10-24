@@ -28,12 +28,25 @@ export class ApiError extends Error {
 const BASE = "/api/v1";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  let token: string | null = null;
+  if (typeof window !== "undefined") {
+    try {
+      token = localStorage.getItem("ktt_admin_token") || localStorage.getItem("ktt_student_token");
+    } catch {
+      // localStorage access may be restricted
+    }
+  }
+
   let res: Response;
   try {
     res = await fetch(`${BASE}${path}`, {
       ...init,
       credentials: "include",
-      headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init?.headers ?? {}),
+      },
     });
   } catch {
     throw new ApiError(0, { code: "NETWORK_ERROR", message: "Network error. Please check your connection." });

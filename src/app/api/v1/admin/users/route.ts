@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 /** Real interns (privacy-safe projection) from database, paginated + searchable. */
 export const GET = route(async (req, { requestId }) => {
-  await requireAdmin("users.read");
+  await requireAdmin("users.read", req);
   const url = new URL(req.url);
   const search = url.searchParams.get("search") ?? undefined;
   const page = Math.max(1, Number(url.searchParams.get("page") ?? 1));

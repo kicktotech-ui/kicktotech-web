@@ -10,6 +10,6 @@ export const POST = route(async (req, { requestId }) => {
   const ip = clientIp(req);
   rateLimit(`login:${ip}`);
   const input = await parseJson(req, loginSchema);
-  const user = await loginStudent(input, { ip, requestId });
-  return ok({ user }, { requestId });
+  const result = await loginStudent(input, { ip, requestId });
+  return ok({ user: result, token: result.token }, { requestId });
 });

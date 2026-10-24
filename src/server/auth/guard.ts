@@ -69,14 +69,14 @@ export async function requireAuthenticatedStudent(req: Request): Promise<Authent
   throw new AppError("UNAUTHENTICATED", "You must be signed in to access this resource.");
 }
 
-export async function requireStudent(): Promise<UserRecord> {
-  const ctx = await readSession("student");
+export async function requireStudent(req?: Request): Promise<UserRecord> {
+  const ctx = await readSession("student", req);
   if (!ctx) throw new AppError("UNAUTHENTICATED", "You must be signed in.");
   return ctx.user;
 }
 
-export async function requireAdmin(permission?: Permission): Promise<{ user: UserRecord; role: AdminRole }> {
-  const ctx = await readSession("admin");
+export async function requireAdmin(permission?: Permission, req?: Request): Promise<{ user: UserRecord; role: AdminRole }> {
+  const ctx = await readSession("admin", req);
   if (!ctx) throw new AppError("UNAUTHENTICATED", "Admin authentication required.");
   if (ctx.user.type !== "admin" || !isAdminRole(ctx.user.role)) {
     throw new AppError("FORBIDDEN", "You do not have administrator access.");

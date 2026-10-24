@@ -15,7 +15,12 @@ const isProd = process.env.NODE_ENV === "production";
  * it falls back to an insecure value with a warning.
  */
 export function getSessionSecret(): string {
-  const value = process.env.AUTH_SESSION_SECRET || process.env.FIREBASE_PRIVATE_KEY || process.env.RAZORPAY_KEY_SECRET;
+  const value =
+    process.env.AUTH_SESSION_SECRET ||
+    process.env.SESSION_SECRET ||
+    process.env.JWT_SECRET ||
+    process.env.FIREBASE_PRIVATE_KEY ||
+    process.env.RAZORPAY_KEY_SECRET;
   if (value && value.length > 0) return value;
   return "ktt-session-secret-fallback-" + (process.env.FIREBASE_PROJECT_ID || "kicktotech");
 }

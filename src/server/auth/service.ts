@@ -11,9 +11,11 @@ function isReservedAdminEmail(email: string): boolean {
 }
 function nowIso() { return new Date().toISOString(); }
 
+export type AuthResult = PublicUser & { token: string };
+
 // ---- Student registration --------------------------------------------------
 
-export async function registerStudent(input: StudentRegisterInput, meta: { ip: string; requestId: string }): Promise<PublicUser> {
+export async function registerStudent(input: StudentRegisterInput, meta: { ip: string; requestId: string }): Promise<AuthResult> {
   const store = getStore();
 
   if (isReservedAdminEmail(input.email)) {
@@ -40,14 +42,14 @@ export async function registerStudent(input: StudentRegisterInput, meta: { ip: s
     updatedAt: nowIso(),
   };
   await store.createUser(user);
-  await createSession("student", user);
+  const { token } = await createSession("student", user);
   await writeAudit({ actor: user.email, action: "STUDENT_REGISTERED", target: user.id, requestId: meta.requestId, ip: meta.ip });
-  return publicUser(user);
+  return { ...publicUser(user), token };
 }
 
 // ---- Student login ---------------------------------------------------------
 
-export async function loginStudent(input: LoginInput, meta: { ip: string; requestId: string }): Promise<PublicUser> {
+export async function loginStudent(input: LoginInput, meta: { ip: string; requestId: string }): Promise<AuthResult> {
   const store = getStore();
 
   if (isReservedAdminEmail(input.email)) {
@@ -62,9 +64,9 @@ export async function loginStudent(input: LoginInput, meta: { ip: string; reques
   if (user.status !== "active") {
     throw new AppError("FORBIDDEN", "This account is disabled. Contact support.");
   }
-  await createSession("student", user);
+  const { token } = await createSession("student", user);
   await writeAudit({ actor: user.email, action: "STUDENT_LOGIN", target: user.id, requestId: meta.requestId, ip: meta.ip });
-  return publicUser(user);
+  return { ...publicUser(user), token };
 }
 
 // ---- Admin bootstrap + login ----------------------------------------------
@@ -109,7 +111,7 @@ export async function ensureAdminBootstrap(): Promise<void> {
   await writeAudit({ actor: "system", action: "ADMIN_BOOTSTRAPPED", target: adminEmail });
 }
 
-export async function loginAdmin(input: LoginInput, meta: { ip: string; requestId: string }): Promise<PublicUser> {
+export async function loginAdmin(input: LoginInput, meta: { ip: string; requestId: string }): Promise<AuthResult> {
   const normEmail = input.email.trim().toLowerCase();
   const store = getStore();
   const bootstrapPassword = config.admin.bootstrapPassword;
@@ -137,9 +139,9 @@ export async function loginAdmin(input: LoginInput, meta: { ip: string; requestI
       });
       await writeAudit({ actor: "system", action: "ADMIN_BOOTSTRAPPED", target: normEmail });
     }
-    await createSession("admin", admin);
+    const { token } = await createSession("admin", admin);
     await writeAudit({ actor: admin.email, action: "ADMIN_LOGIN", target: admin.id, requestId: meta.requestId, ip: meta.ip });
-    return publicUser(admin);
+    return { ...publicUser(admin), token };
   }
 
   // 2. Stored Database PBKDF2 Password Verification
@@ -170,9 +172,9 @@ export async function loginAdmin(input: LoginInput, meta: { ip: string; requestI
     throw new AppError("FORBIDDEN", "This administrator account is disabled.");
   }
 
-  await createSession("admin", admin);
+  const { token } = await createSession("admin", admin);
   await writeAudit({ actor: admin.email, action: "ADMIN_LOGIN", target: admin.id, requestId: meta.requestId, ip: meta.ip });
-  return publicUser(admin);
+  return { ...publicUser(admin), token };
 }
 
 // ---- Logout ----------------------------------------------------------------

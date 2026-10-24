@@ -296,11 +296,17 @@ function toAdminUser(u: ApiAdminUser): AdminUser {
  */
 export const authService = {
   async login(email: string, password: string): Promise<AdminUser> {
-    const { user } = await api.post<{ user: ApiAdminUser }>("/auth/admin/login", { email, password });
-    return toAdminUser(user);
+    const res = await api.post<{ user: ApiAdminUser; token?: string }>("/auth/admin/login", { email, password });
+    if (res.token && typeof window !== "undefined") {
+      try { localStorage.setItem("ktt_admin_token", res.token); } catch {}
+    }
+    return toAdminUser(res.user);
   },
   async logout(): Promise<void> {
     try { await api.post("/auth/admin/logout"); } catch { /* cookie cleared server-side */ }
+    if (typeof window !== "undefined") {
+      try { localStorage.removeItem("ktt_admin_token"); } catch {}
+    }
   },
   async me(): Promise<AdminUser | null> {
     try {
