@@ -31,7 +31,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let token: string | null = null;
   if (typeof window !== "undefined") {
     try {
-      token = localStorage.getItem("ktt_admin_token") || localStorage.getItem("ktt_student_token");
+      if (path.includes("/admin")) {
+        token = localStorage.getItem("ktt_admin_token");
+      } else {
+        token = localStorage.getItem("ktt_student_token") || localStorage.getItem("ktt_admin_token");
+      }
     } catch {
       // localStorage access may be restricted
     }

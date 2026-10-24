@@ -40,9 +40,19 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Cache-Control": "no-store",
 };
 
-function withHeaders(res: NextResponse, requestId: string): NextResponse {
+function withHeaders(res: NextResponse, requestId: string, req?: Request): NextResponse {
   for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.headers.set(k, v);
   res.headers.set("X-Request-Id", requestId);
+
+  // CORS support: allow Vercel frontend and custom domain
+  const origin = req?.headers.get("origin");
+  if (origin) {
+    res.headers.set("Access-Control-Allow-Origin", origin);
+    res.headers.set("Access-Control-Allow-Credentials", "true");
+    res.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+    res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-Request-Id, X-Admin-Token, X-Session-Token");
+  }
+
   return res;
 }
 
@@ -65,8 +75,15 @@ export function fail(code: ErrorCode, message: string, details?: unknown, reques
 export function route(handler: (req: Request, ctx: { requestId: string; params?: Record<string, string> }) => Promise<NextResponse>) {
   return async (req: Request, context?: { params?: Record<string, string> }) => {
     const requestId = uuid();
+
+    if (req.method === "OPTIONS") {
+      const preflight = new NextResponse(null, { status: 204 });
+      return withHeaders(preflight, requestId, req);
+    }
+
     try {
-      return await handler(req, { requestId, params: context?.params });
+      const res = await handler(req, { requestId, params: context?.params });
+      return withHeaders(res, requestId, req);
     } catch (err) {
       if (err instanceof AppError) {
         return fail(err.code, err.message, err.details, requestId);

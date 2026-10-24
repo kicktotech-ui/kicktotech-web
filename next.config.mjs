@@ -16,6 +16,24 @@ const nextConfig = {
       { source: "/events/detail/:id", destination: "/events/:id", permanent: false },
     ];
   },
+  async rewrites() {
+    const rawBackend =
+      process.env.RENDER_BACKEND_URL ||
+      process.env.NEXT_PUBLIC_RENDER_BACKEND_URL ||
+      process.env.BACKEND_URL;
+    if (rawBackend && rawBackend.trim()) {
+      const backend = rawBackend.trim().replace(/\/+$/, "");
+      return {
+        beforeFiles: [
+          {
+            source: "/api/v1/:path*",
+            destination: `${backend}/api/v1/:path*`,
+          },
+        ],
+      };
+    }
+    return [];
+  },
 };
 
 export default nextConfig;
