@@ -14,7 +14,7 @@ export function clientIp(req: Request): string {
   return req.headers.get("x-real-ip") ?? "local";
 }
 
-export function rateLimit(key: string, max = config.rateLimit.maxAuthAttempts, windowMs = config.rateLimit.windowMs): void {
+export function rateLimit(key: string, max: number = config.rateLimit.maxAuthAttempts, windowMs: number = config.rateLimit.windowMs): void {
   const now = Date.now();
   const bucket = buckets.get(key);
   if (!bucket || now > bucket.resetAt) {

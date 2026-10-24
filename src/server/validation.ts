@@ -31,6 +31,15 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required.").max(128),
 });
 
+export const forgotPasswordSchema = z.object({
+  email: emailSchema,
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().trim().min(10, "Invalid reset token."),
+  password: passwordSchema,
+});
+
 export const issueCertificateSchema = z.object({
   recipientName: z.string().trim().min(2).max(120),
   email: emailSchema.optional(),

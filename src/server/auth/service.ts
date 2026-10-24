@@ -1,7 +1,7 @@
 import { timingSafeEqual, createHash } from "node:crypto";
 import { config } from "../config";
 import { AppError } from "../http";
-import { hashPassword, verifyPassword } from "../crypto";
+import { hashPassword, verifyPassword, sign, unsign } from "../crypto";
 import { getStore, type UserRecord } from "../data";
 import { createSession, clearSession, publicUser, type PublicUser } from "./session";
 import { writeAudit } from "../audit";
@@ -194,4 +194,73 @@ export async function logout(
 ): Promise<void> {
   await clearSession(type, req);
   await writeAudit({ actor: meta.actor ?? "unknown", action: type === "admin" ? "ADMIN_LOGOUT" : "STUDENT_LOGOUT", requestId: meta.requestId, ip: meta.ip });
+}
+
+// ---- Password Reset --------------------------------------------------------
+
+export function createPasswordResetToken(user: UserRecord): string {
+  const payload = Buffer.from(
+    JSON.stringify({
+      uid: user.id,
+      email: user.email.toLowerCase().trim(),
+      hashSlice: user.passwordHash.slice(0, 10),
+      exp: Date.now() + 3600_000, // 1 hour
+      purpose: "pwd_reset",
+    })
+  ).toString("base64url");
+  return sign(payload);
+}
+
+export async function verifyPasswordResetToken(token: string): Promise<UserRecord | null> {
+  const raw = unsign(token);
+  if (!raw) return null;
+  try {
+    const jsonStr = Buffer.from(raw, "base64url").toString("utf8");
+    const data = JSON.parse(jsonStr);
+    if (!data.uid || !data.email || !data.exp || data.purpose !== "pwd_reset") return null;
+    if (Date.now() > data.exp) return null;
+
+    const store = getStore();
+    const user = await store.getUserById(data.uid);
+    if (!user || user.status !== "active") return null;
+    if (user.email.toLowerCase().trim() !== data.email.toLowerCase().trim()) return null;
+    // Replay check: if password was already changed, hashSlice will not match
+    if (data.hashSlice && user.passwordHash.slice(0, 10) !== data.hashSlice) return null;
+
+    return user;
+  } catch {
+    return null;
+  }
+}
+
+export async function resetPasswordWithToken(
+  token: string,
+  newPassword: string,
+  meta: { ip: string; requestId: string }
+): Promise<void> {
+  const user = await verifyPasswordResetToken(token);
+  if (!user) {
+    throw new AppError("INVALID_CREDENTIALS", "Password reset link is invalid or has expired. Please request a new one.");
+  }
+
+  if (newPassword.length < config.password.minLength) {
+    throw new AppError("VALIDATION_ERROR", `Password must be at least ${config.password.minLength} characters.`);
+  }
+
+  const { salt, hash } = hashPassword(newPassword);
+  const store = getStore();
+  await store.createUser({
+    ...user,
+    passwordSalt: salt,
+    passwordHash: hash,
+    updatedAt: nowIso(),
+  });
+
+  await writeAudit({
+    actor: user.email,
+    action: "PASSWORD_RESET",
+    target: user.id,
+    requestId: meta.requestId,
+    ip: meta.ip,
+  });
 }

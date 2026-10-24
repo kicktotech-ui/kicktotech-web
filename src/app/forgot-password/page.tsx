@@ -21,10 +21,24 @@ export default function ForgotPasswordPage() {
     setState("loading");
     setError(null);
 
-    // Simulate sending password reset instructions
-    setTimeout(() => {
+    try {
+      const res = await fetch("/api/v1/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(data?.error?.message || "Failed to send reset instructions. Please try again.");
+        setState("idle");
+        return;
+      }
       setState("sent");
-    }, 600);
+    } catch (err) {
+      console.error("[forgot-password] Network error:", err);
+      setError("Network error. Please check your connection and try again.");
+      setState("idle");
+    }
   }
 
   return (
