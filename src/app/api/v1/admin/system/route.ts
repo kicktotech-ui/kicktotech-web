@@ -14,7 +14,14 @@ export const GET = route(async (_req, { requestId }) => {
   try {
     const store = getStore();
     const count = await store.countCertificates();
-    dbStatus = { name: "Database", state: "OPERATIONAL", detail: `MongoDB connected · ${count} certificates` };
+    const isMongo = Boolean(process.env.MONGODB_URI);
+    dbStatus = {
+      name: "Database",
+      state: isMongo ? "OPERATIONAL" : "DEGRADED",
+      detail: isMongo
+        ? `MongoDB connected · ${count} certificates`
+        : "In-memory mode · Set MONGODB_URI in deployment environment variables to sync real database",
+    };
   } catch (err) {
     dbStatus = { name: "Database", state: "NOT_CONNECTED", detail: `Database unreachable: ${(err as Error)?.message || "Check connection"}` };
   }
