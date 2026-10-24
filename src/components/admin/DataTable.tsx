@@ -78,7 +78,7 @@ export function DataTable<T extends { id: string }>({
     else { setSortBy(key); setSortDir("asc"); }
   };
 
-  const rows = data?.rows ?? [];
+  const rows = useMemo(() => data?.rows ?? [], [data?.rows]);
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const selectedRows = useMemo(() => rows.filter((r) => selected.has(r.id)), [rows, selected]);

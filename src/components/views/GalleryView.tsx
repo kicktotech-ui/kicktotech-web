@@ -19,7 +19,7 @@ export function GalleryView() {
   const [filter, setFilter] = useState("All");
   const [active, setActive] = useState<number | null>(null);
 
-  const all = data ?? [];
+  const all = useMemo(() => data ?? [], [data]);
   const categories = useMemo(() => ["All", ...Array.from(new Set(all.map((g) => g.category)))], [all]);
   const items = useMemo<GalleryItem[]>(
     () => (filter === "All" ? all : all.filter((g) => g.category === filter)),

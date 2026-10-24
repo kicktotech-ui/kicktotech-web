@@ -17,7 +17,7 @@ export const GET = route(async (_req, { requestId }) => {
     const isMongo = Boolean(process.env.MONGODB_URI);
     dbStatus = {
       name: "Database",
-      state: isMongo ? "OPERATIONAL" : "DEGRADED",
+      state: isMongo ? "OPERATIONAL" : "MOCK",
       detail: isMongo
         ? `MongoDB connected · ${count} certificates`
         : "In-memory mode · Set MONGODB_URI in deployment environment variables to sync real database",
