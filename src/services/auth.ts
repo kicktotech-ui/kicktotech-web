@@ -86,10 +86,10 @@ const realAuthService: AuthService = {
 
   async getCurrentUser() {
     try {
-      const { user } = await api.get<{ user: ApiUser }>("/auth/student/me");
-      return toProfile(user);
+      const res = await api.get<{ user: ApiUser | null }>("/auth/student/me");
+      return res.user ? toProfile(res.user) : null;
     } catch {
-      return null; // 401 → not signed in
+      return null;
     }
   },
 };

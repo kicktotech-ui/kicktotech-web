@@ -1,11 +1,13 @@
 import { route, ok } from "@/server/http";
-import { requireStudent } from "@/server/auth/guard";
-import { publicUser } from "@/server/auth/session";
+import { readSession, publicUser } from "@/server/auth/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export const GET = route(async (_req, { requestId }) => {
-  const user = await requireStudent();
-  return ok({ user: publicUser(user) }, { requestId });
+  const ctx = await readSession("student");
+  if (!ctx || !ctx.user || ctx.user.status !== "active") {
+    return ok({ user: null }, { requestId });
+  }
+  return ok({ user: publicUser(ctx.user) }, { requestId });
 });

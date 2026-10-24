@@ -304,10 +304,10 @@ export const authService = {
   },
   async me(): Promise<AdminUser | null> {
     try {
-      const { user } = await api.get<{ user: ApiAdminUser }>("/auth/admin/me");
-      return toAdminUser(user);
+      const res = await api.get<{ user: ApiAdminUser | null }>("/auth/admin/me");
+      return res.user ? toAdminUser(res.user) : null;
     } catch {
-      return null; // 401/403 → not an authenticated admin
+      return null; // not an authenticated admin
     }
   },
   devEmail: DEV_EMAIL,
