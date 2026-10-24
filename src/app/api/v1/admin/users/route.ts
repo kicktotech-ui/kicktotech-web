@@ -15,10 +15,6 @@ export const GET = route(async (req, { requestId }) => {
   const page = Math.max(1, Number(url.searchParams.get("page") ?? 1));
   const pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get("pageSize") ?? 10)));
 
-  if (isInternshipMaintenance()) {
-    return ok({ rows: [], total: 0, page, pageSize, maintenance: true }, { requestId });
-  }
-
   const { rows, total } = await getStore().listStudents({ search, page, pageSize });
   return ok({ rows: rows.map(publicUser), total, page, pageSize }, { requestId });
 });

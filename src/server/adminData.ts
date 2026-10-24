@@ -255,10 +255,6 @@ export async function queryCollection(name: string, opts: QueryOpts): Promise<Qu
   const def = REGISTRY[name];
   if (!def) return { rows: [], total: 0, row: opts.id ? null : undefined };
 
-  if (name === "interns" && isInternshipMaintenance()) {
-    return { rows: [], total: 0, row: opts.id ? null : undefined };
-  }
-
   try {
     const db = await getMongoDb();
     const col = db.collection(def.collection);

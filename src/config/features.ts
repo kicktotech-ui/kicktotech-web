@@ -15,8 +15,8 @@
 
 const envFlag = process.env.NEXT_PUBLIC_INTERNSHIP_MAINTENANCE ?? process.env.INTERNSHIP_MAINTENANCE;
 
-// Defaults to TRUE (active maintenance mode) during the Hackathon priority period.
-const defaultInternshipMaintenance = true;
+// Defaults to FALSE now that MongoDB Atlas migration is complete.
+const defaultInternshipMaintenance = false;
 
 const isMaintenanceActive =
   envFlag !== undefined ? envFlag.toLowerCase() === "true" || envFlag === "1" : defaultInternshipMaintenance;

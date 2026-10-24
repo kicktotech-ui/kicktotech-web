@@ -19,7 +19,8 @@ export const navGroups: NavGroup[] = [
   {
     label: "People",
     items: [
-      { label: "Interns", href: "/admin/interns", icon: Users },
+      { label: "Users", href: "/admin/users", icon: Users },
+      { label: "Interns", href: "/admin/interns", icon: GraduationCap },
       { label: "Applications", href: "/admin/applications", icon: FileText },
       { label: "Mentors", href: "/admin/mentors", icon: GraduationCap },
       { label: "Faculty", href: "/admin/faculty", icon: Building2 },
@@ -82,6 +83,7 @@ export const flatNav: NavItem[] = navGroups.flatMap((g) => g.items);
 /** Human breadcrumb label for a given /admin path segment. */
 export const segmentLabels: Record<string, string> = {
   admin: "Admin",
+  users: "Users",
   interns: "Interns",
   applications: "Applications",
   mentors: "Mentors",
