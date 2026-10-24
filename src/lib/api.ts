@@ -65,6 +65,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const body = json as { success?: boolean; data?: T; error?: ApiErrorShape } | null;
 
   if (!res.ok || !body?.success) {
+    if (
+      res.status === 401 &&
+      typeof window !== "undefined" &&
+      window.location.pathname.startsWith("/admin") &&
+      window.location.pathname !== "/admin/login"
+    ) {
+      try {
+        localStorage.removeItem("ktt_admin_token");
+        localStorage.removeItem("ktt_admin_user");
+      } catch {}
+      window.location.href = "/admin/login";
+    }
     throw new ApiError(res.status, body?.error ?? { code: "SERVER_ERROR", message: "Something went wrong." });
   }
   return body.data as T;
