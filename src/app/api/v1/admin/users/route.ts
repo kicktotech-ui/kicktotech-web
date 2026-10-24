@@ -1,13 +1,13 @@
 import { route, ok } from "@/server/http";
 import { requireAdmin } from "@/server/auth/guard";
-import { firebaseStore } from "@/server/data/firebase";
+import { getStore } from "@/server/data";
 import { publicUser } from "@/server/auth/session";
 import { isInternshipMaintenance } from "@/config/features";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Real interns (privacy-safe projection) from live Firestore, paginated + searchable. */
+/** Real interns (privacy-safe projection) from database, paginated + searchable. */
 export const GET = route(async (req, { requestId }) => {
   await requireAdmin("users.read");
   const url = new URL(req.url);
@@ -19,6 +19,6 @@ export const GET = route(async (req, { requestId }) => {
     return ok({ rows: [], total: 0, page, pageSize, maintenance: true }, { requestId });
   }
 
-  const { rows, total } = await firebaseStore().listStudents({ search, page, pageSize });
+  const { rows, total } = await getStore().listStudents({ search, page, pageSize });
   return ok({ rows: rows.map(publicUser), total, page, pageSize }, { requestId });
 });

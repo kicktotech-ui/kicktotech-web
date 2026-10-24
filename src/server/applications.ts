@@ -8,8 +8,9 @@ import type { ApplicationInput, AdminCreateApplicationInput } from "./validation
 import { sendBrevoTemplateEmail } from "./email/brevo";
 import { sendHackathonConfirmationEmail } from "./hackathonApplications";
 import { syncConfirmedHackathonParticipant } from "./integrations/googleSheets";
-import { getAdminDb, isAdminConfigured } from "./firebase/admin";
-import { invalidateApplicationsCache } from "./data/firebase";
+import { getMongoDb } from "./data/mongodb";
+
+const invalidateApplicationsCache = () => {};
 
 /*
  * Internship application service — the manual UPI + WhatsApp payment gate.
@@ -192,54 +193,47 @@ export async function grantInternshipAccess(
   const activationCode = String(Math.floor(1000 + Math.random() * 9000));
   const dashboardUrl = "https://kicktotech.in/internship/dashboard";
 
-  // If Firebase Admin is available, write to interns & manual_activations collections
-  if (isAdminConfigured()) {
-    try {
-      const db = await getAdminDb();
-      const internDoc = {
-        id: verified.id,
-        internId,
-        name: verified.name,
-        email: verified.email,
-        phone: verified.phone,
-        college: verified.college || "Kick To Tech Student",
-        domainId: domainSlug,
-        status: "ACTIVE",
-        paymentStatus: "PAID",
-        certificateStatus: "NOT_READY",
-        progress: 0,
-        mentorId: verified.mentorId,
-        joinedAt: verified.verifiedAt || now,
-        avatarColor: "#0057ff",
-      };
+  // Write to MongoDB interns & manual_activations collections
+  try {
+    const db = await getMongoDb();
+    const internDoc = {
+      id: verified.id,
+      internId,
+      name: verified.name,
+      email: verified.email,
+      phone: verified.phone,
+      college: verified.college || "Kick To Tech Student",
+      domainId: domainSlug,
+      status: "ACTIVE",
+      paymentStatus: "PAID",
+      certificateStatus: "NOT_READY",
+      progress: 0,
+      mentorId: verified.mentorId,
+      joinedAt: verified.verifiedAt || now,
+      avatarColor: "#0057ff",
+    };
 
-      await Promise.allSettled([
-        db.collection("interns").doc(verified.id).set(internDoc, { merge: true }),
-        db.collection("ktt_interns").doc(verified.id).set(internDoc, { merge: true }),
-        db.collection("manual_activations").doc(`act_${verified.id}`).set({
-          id: `act_${verified.id}`,
-          code: activationCode,
-          internName: verified.name,
-          internEmail: verified.email,
-          domainId: domainSlug,
-          status: "AVAILABLE",
-          createdAt: now,
-          expiresAt: new Date(Date.now() + 90 * 864e5).toISOString(),
-        }, { merge: true }),
-        db.collection("ktt_manual_activations").doc(`act_${verified.id}`).set({
-          id: `act_${verified.id}`,
-          code: activationCode,
-          internName: verified.name,
-          internEmail: verified.email,
-          domainId: domainSlug,
-          status: "AVAILABLE",
-          createdAt: now,
-          expiresAt: new Date(Date.now() + 90 * 864e5).toISOString(),
-        }, { merge: true }),
-      ]);
-    } catch (err) {
-      console.warn("[applications] Could not write intern/activation records to Firestore:", err);
-    }
+    await Promise.allSettled([
+      db.collection("interns").updateOne({ id: verified.id }, { $set: internDoc }, { upsert: true }),
+      db.collection("manual_activations").updateOne(
+        { id: `act_${verified.id}` },
+        {
+          $set: {
+            id: `act_${verified.id}`,
+            code: activationCode,
+            internName: verified.name,
+            internEmail: verified.email,
+            domainId: domainSlug,
+            status: "AVAILABLE",
+            createdAt: now,
+            expiresAt: new Date(Date.now() + 90 * 864e5).toISOString(),
+          },
+        },
+        { upsert: true },
+      ),
+    ]);
+  } catch (err) {
+    console.warn("[applications] Could not write intern/activation records to MongoDB:", err);
   }
 
   // Attempt confirmation email

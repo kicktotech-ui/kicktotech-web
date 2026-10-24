@@ -29,7 +29,7 @@ export default function CertificationPage() {
 
   const columns: Column<Certificate>[] = [
     { key: "internName", header: "Intern", sortable: true, render: (r) => <div><p className="font-medium text-adm-fg">{r.internName}</p><p className="font-mono text-[11px] text-adm-muted">{r.internRef}</p></div> },
-    { key: "domainId", header: "Domain", render: (r) => <span className="text-xs text-adm-fg">{domainLabel[r.domainId].split(" ")[0]}</span> },
+    { key: "domainId", header: "Domain", render: (r) => <span className="text-xs text-adm-fg">{(r.domainId && domainLabel[r.domainId]?.split(" ")[0]) || r.domainId || "General"}</span> },
     { key: "grade", header: "Grade", render: (r) => <span className="font-bold text-adm-fg">{r.grade}</span> },
     { key: "certificateId", header: "Certificate ID", render: (r) => <span className="font-mono text-xs text-adm-muted">{r.certificateId || "—"}</span> },
     { key: "status", header: "Status", render: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge> },

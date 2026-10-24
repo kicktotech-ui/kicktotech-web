@@ -1,20 +1,17 @@
 import { route, ok } from "@/server/http";
 import { requireAdmin } from "@/server/auth/guard";
-import { firebaseStore } from "@/server/data/firebase";
+import { getStore } from "@/server/data";
 import type { DashboardData } from "@/lib/admin/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Real dashboard analytics computed from the LIVE Firestore data (read-only).
- * Auth/session is enforced via the session store; the numbers come from the
- * existing Firebase collections. If Firestore is unreachable the route wrapper
- * returns a real error envelope (UI shows a connection error) — never fake data.
+ * Real dashboard analytics computed from the database.
  */
 export const GET = route(async (_req, { requestId }) => {
   await requireAdmin("analytics.read");
-  const store = firebaseStore();
+  const store = getStore();
 
   const domainAccents: Record<string, string> = {
     python: "#0057ff", java: "#ea580c", "data-analytics": "#7c3aed", cybersecurity: "#16a34a",

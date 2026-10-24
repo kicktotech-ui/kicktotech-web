@@ -14,7 +14,7 @@ import { formatDate } from "@/lib/utils";
 const columns: Column<Activation>[] = [
   { key: "code", header: "Code", render: (r) => <span className="rounded bg-neutral-900 px-2 py-0.5 font-mono text-xs font-bold text-[#f5c400]">{r.code}</span> },
   { key: "internName", header: "Intern", render: (r) => r.internName ? <div><p className="font-medium text-adm-fg">{r.internName}</p><p className="text-xs text-adm-muted">{r.internEmail}</p></div> : <span className="text-xs text-adm-muted">Unassigned</span> },
-  { key: "domainId", header: "Domain", render: (r) => <Badge tone="neutral">{domainLabel[r.domainId].split(" ")[0]}</Badge> },
+  { key: "domainId", header: "Domain", render: (r) => <Badge tone="neutral">{(r.domainId && domainLabel[r.domainId]?.split(" ")[0]) || r.domainId || "General"}</Badge> },
   { key: "status", header: "Status", render: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge> },
   { key: "createdAt", header: "Created", sortable: true, render: (r) => <span className="text-xs text-adm-muted">{formatDate(r.createdAt)}</span> },
   { key: "expiresAt", header: "Expires", sortable: true, render: (r) => <span className="text-xs text-adm-muted">{formatDate(r.expiresAt)}</span> },

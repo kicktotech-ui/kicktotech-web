@@ -52,16 +52,21 @@ export async function readSession(type: AccountType): Promise<{ session: Session
   const sessionId = unsign(raw);
   if (!sessionId) return null;
 
-  const store = getStore();
-  const session = await store.getSessionById(sessionId);
-  if (!session || session.type !== type) return null;
-  if (Date.now() > new Date(session.expiresAt).getTime()) {
-    await store.deleteSession(session.id);
+  try {
+    const store = getStore();
+    const session = await store.getSessionById(sessionId);
+    if (!session || session.type !== type) return null;
+    if (Date.now() > new Date(session.expiresAt).getTime()) {
+      await store.deleteSession(session.id).catch(() => {});
+      return null;
+    }
+    const user = await store.getUserById(session.userId);
+    if (!user || user.status !== "active") return null;
+    return { session, user };
+  } catch (err) {
+    console.warn("[session] Database unreachable when reading session:", err);
     return null;
   }
-  const user = await store.getUserById(session.userId);
-  if (!user || user.status !== "active") return null;
-  return { session, user };
 }
 
 export async function clearSession(type: AccountType): Promise<void> {

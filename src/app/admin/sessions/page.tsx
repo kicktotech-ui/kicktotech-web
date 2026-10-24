@@ -11,7 +11,7 @@ import { formatDate } from "@/lib/utils";
 
 const columns: Column<LiveSession>[] = [
   { key: "title", header: "Session", sortable: true, render: (r) => <div className="flex items-center gap-2"><Video className="h-4 w-4 text-adm-muted" /><span className="font-medium text-adm-fg">{r.title}</span></div> },
-  { key: "domainId", header: "Domain", render: (r) => <span className="text-xs font-medium">{domainLabel[r.domainId]}</span> },
+  { key: "domainId", header: "Domain", render: (r) => <span className="text-xs font-medium">{domainLabel[r.domainId] || r.domainId || "General"}</span> },
   { key: "mentorName", header: "Mentor", render: (r) => <span className="text-sm text-adm-muted">{r.mentorName}</span> },
   { key: "date", header: "Date", sortable: true, render: (r) => <span className="text-sm">{formatDate(r.date)}</span> },
   { key: "startTime", header: "Time", render: (r) => <span className="text-xs text-adm-muted">{r.startTime}–{r.endTime}</span> },

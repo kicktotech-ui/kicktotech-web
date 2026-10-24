@@ -61,7 +61,7 @@ function loadRazorpayScript(): Promise<boolean> {
 }
 
 export function Hack2SkillRegisterFlow() {
-  const { user, firebaseUser } = useAuth();
+  const { user } = useAuth();
   const [phase, setPhase] = useState<Phase>("form");
   const [step, setStep] = useState(0);
   const [personal, setPersonal] = useState({ name: "", email: "", phone: "" });
@@ -95,9 +95,6 @@ export function Hack2SkillRegisterFlow() {
 
       async function checkExistingRegistration() {
         try {
-          const token = firebaseUser ? await firebaseUser.getIdToken() : undefined;
-          const headers: Record<string, string> = {};
-          if (token) headers["Authorization"] = `Bearer ${token}`;
           const res = await api.get<{
             hackathon?: {
               enrolled?: boolean;
@@ -115,7 +112,7 @@ export function Hack2SkillRegisterFlow() {
                 status?: string;
               } | null;
             };
-          }>("/student/dashboard", { headers });
+          }>("/student/dashboard");
 
           if (!active) return;
           const reg = res?.hackathon?.registration;
@@ -161,7 +158,7 @@ export function Hack2SkillRegisterFlow() {
     return () => {
       active = false;
     };
-  }, [user, firebaseUser]);
+  }, [user]);
 
   const markTouched = (key: string) => setTouched((t) => ({ ...t, [key]: true }));
 
@@ -244,13 +241,8 @@ export function Hack2SkillRegisterFlow() {
           return;
         }
 
-        const token = firebaseUser ? await firebaseUser.getIdToken() : undefined;
-        const headers: Record<string, string> = {};
-        if (token) {
-          headers["Authorization"] = `Bearer ${token}`;
-        }
-
         // 1. Create or retrieve server-authorized Razorpay Order
+        const headers: Record<string, string> = {};
         const order = await api.post<{
           orderId: string;
           amount: number;
@@ -350,7 +342,7 @@ export function Hack2SkillRegisterFlow() {
         setSubmitting(false);
       }
     },
-    [firebaseUser, personal, user, pollPaymentStatus],
+    [personal, user, pollPaymentStatus],
   );
 
   /** Initial registration submission -> directly initiates Razorpay Checkout */
@@ -358,11 +350,6 @@ export function Hack2SkillRegisterFlow() {
     setSubmitting(true);
     setError(null);
     try {
-      const token = firebaseUser ? await firebaseUser.getIdToken() : undefined;
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
       const res = await api.post<ApplyResponse>(
         "/hackathon/apply",
         {
@@ -374,7 +361,6 @@ export function Hack2SkillRegisterFlow() {
           year: academic.year,
           teamName: academic.teamName || undefined,
         },
-        { headers },
       );
       setApplied(res);
 
@@ -388,7 +374,7 @@ export function Hack2SkillRegisterFlow() {
       setError(e instanceof ApiError ? e.message : "Could not start your registration. Please try again.");
       setSubmitting(false);
     }
-  }, [personal, academic, user, firebaseUser, launchRazorpay]);
+  }, [personal, academic, user, launchRazorpay]);
 
   return (
     <Section className="pt-8">

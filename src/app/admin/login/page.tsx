@@ -42,7 +42,7 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className={cn("ktt-admin grid min-h-screen bg-adm-bg lg:grid-cols-2", resolved === "dark" && "dark")}>
+    <div suppressHydrationWarning className={cn("ktt-admin grid min-h-screen bg-adm-bg lg:grid-cols-2", resolved === "dark" && "dark")}>
       {/* Brand panel */}
       <div className="relative hidden flex-col justify-between overflow-hidden bg-neutral-950 p-12 text-white lg:flex">
         <div className="pointer-events-none absolute inset-0 opacity-[0.06] [background-image:linear-gradient(#fff_1px,transparent_1px),linear-gradient(90deg,#fff_1px,transparent_1px)] [background-size:40px_40px]" />

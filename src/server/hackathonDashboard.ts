@@ -1,4 +1,4 @@
-import { getAdminDb, isAdminConfigured } from "./firebase/admin";
+import { getMongoDb } from "./data/mongodb";
 import { writeAudit } from "./audit";
 import type { HackathonDashboardConfig, HackathonScheduleItem, HackathonResourceItem } from "@/types";
 
@@ -121,11 +121,6 @@ const globalMemoryRef = globalThis as unknown as {
   __kttHackathonDashboardConfig?: HackathonDashboardConfig;
 };
 
-/**
- * Retrieve the current Hackathon Dashboard configuration.
- * Reads from Firestore (settings/hackathon_dashboard) if configured,
- * otherwise returns in-memory cached copy or default template.
- */
 export async function getHackathonDashboardConfig(): Promise<HackathonDashboardConfig> {
   const normalizeConfig = (cfg: HackathonDashboardConfig): HackathonDashboardConfig => {
     const isPlaceholder = (u?: string) =>
@@ -165,98 +160,20 @@ export async function getHackathonDashboardConfig(): Promise<HackathonDashboardC
     };
   };
 
-  if (globalMemoryRef.__kttHackathonDashboardConfig) {
-    // Check if Firestore has a newer copy when configured
-    if (!isAdminConfigured()) {
-      return normalizeConfig(globalMemoryRef.__kttHackathonDashboardConfig);
+  try {
+    const db = await getMongoDb();
+    const doc = await db.collection("settings").findOne({ _id: "hackathon_dashboard" as any });
+    if (doc) {
+      const { _id, ...data } = doc;
+      const merged: HackathonDashboardConfig = {
+        ...DEFAULT_HACKATHON_DASHBOARD_CONFIG,
+        ...(data as Partial<HackathonDashboardConfig>),
+      };
+      globalMemoryRef.__kttHackathonDashboardConfig = merged;
+      return normalizeConfig(merged);
     }
-  }
-
-  if (isAdminConfigured()) {
-    try {
-      const db = await getAdminDb();
-      const doc = await db.collection("settings").doc("hackathon_dashboard").get();
-      if (doc.exists) {
-        const data = doc.data() as Partial<HackathonDashboardConfig>;
-        const rawWhatsapp = data.whatsappGroupUrl;
-        const whatsappUrl =
-          rawWhatsapp &&
-          rawWhatsapp !== "https://chat.whatsapp.com/" &&
-          rawWhatsapp !== "https://chat.whatsapp.com" &&
-          rawWhatsapp.includes("chat.whatsapp.com/")
-            ? rawWhatsapp
-            : OFFICIAL_WHATSAPP_COMMUNITY_URL;
-
-        const rawResources = Array.isArray(data.resources)
-          ? data.resources
-          : DEFAULT_HACKATHON_DASHBOARD_CONFIG.resources;
-
-        const normalizedResources = rawResources.map((r) => {
-          const isWhatsApp =
-            r.id === "res-2" ||
-            r.title?.toLowerCase().includes("whatsapp") ||
-            (typeof r.url === "string" && r.url.includes("chat.whatsapp.com"));
-
-          if (isWhatsApp) {
-            const hasProperCode =
-              typeof r.url === "string" && r.url.includes("IJJw79iVdWMDTzZ9f9QcYN");
-            if (!hasProperCode) {
-              return {
-                ...r,
-                title:
-                  r.title && !r.title.toLowerCase().includes("whatsapp")
-                    ? r.title
-                    : "Official WhatsApp Participant Community",
-                url: OFFICIAL_WHATSAPP_COMMUNITY_URL,
-              };
-            }
-          }
-          return r;
-        });
-
-        const merged: HackathonDashboardConfig = {
-          ...DEFAULT_HACKATHON_DASHBOARD_CONFIG,
-          ...data,
-          whatsappGroupUrl: whatsappUrl,
-          schedule: Array.isArray(data.schedule)
-            ? data.schedule
-            : DEFAULT_HACKATHON_DASHBOARD_CONFIG.schedule,
-          resources: normalizedResources,
-        };
-
-        const hadLegacyPlaceholder =
-          data.whatsappGroupUrl === "https://chat.whatsapp.com/" ||
-          data.whatsappGroupUrl === "https://chat.whatsapp.com" ||
-          !data.whatsappGroupUrl ||
-          rawResources.some(
-            (r) =>
-              (r.id === "res-2" ||
-                r.title?.toLowerCase().includes("whatsapp") ||
-                (typeof r.url === "string" && r.url.includes("chat.whatsapp.com"))) &&
-              (!r.url ||
-                r.url === "https://chat.whatsapp.com/" ||
-                r.url === "https://chat.whatsapp.com" ||
-                !r.url.includes("IJJw79iVdWMDTzZ9f9QcYN")),
-          );
-
-        if (hadLegacyPlaceholder) {
-          db.collection("settings")
-            .doc("hackathon_dashboard")
-            .set(merged, { merge: true })
-            .catch((err) =>
-              console.warn(
-                "[hackathonDashboard] Auto-migration of WhatsApp community link to Firestore failed:",
-                err,
-              ),
-            );
-        }
-
-        globalMemoryRef.__kttHackathonDashboardConfig = merged;
-        return merged;
-      }
-    } catch (err) {
-      console.warn("[hackathonDashboard] Failed reading config from Firestore, using fallback:", err);
-    }
+  } catch (err) {
+    console.warn("[hackathonDashboard] MongoDB read error, falling back to memory:", err);
   }
 
   const fallback = normalizeConfig(
@@ -270,10 +187,6 @@ export type HackathonDashboardConfigPatch = {
   [K in keyof HackathonDashboardConfig]?: unknown;
 };
 
-/**
- * Update the Hackathon Dashboard configuration.
- * Persists to Firestore and in-memory cache, and appends an audit record.
- */
 export async function saveHackathonDashboardConfig(
   patch: HackathonDashboardConfigPatch,
   meta?: { actor?: string; requestId?: string },
@@ -365,13 +278,15 @@ export async function saveHackathonDashboardConfig(
 
   globalMemoryRef.__kttHackathonDashboardConfig = updated;
 
-  if (isAdminConfigured()) {
-    try {
-      const db = await getAdminDb();
-      await db.collection("settings").doc("hackathon_dashboard").set(updated, { merge: true });
-    } catch (err) {
-      console.warn("[hackathonDashboard] Warning saving to Firestore (in-memory cache preserved):", err);
-    }
+  try {
+    const db = await getMongoDb();
+    await db.collection("settings").updateOne(
+      { _id: "hackathon_dashboard" as any },
+      { $set: updated },
+      { upsert: true },
+    );
+  } catch (err) {
+    console.warn("[hackathonDashboard] Warning saving to MongoDB:", err);
   }
 
   if (meta?.actor) {

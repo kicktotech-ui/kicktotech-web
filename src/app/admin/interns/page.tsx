@@ -27,7 +27,7 @@ const columns: Column<Intern>[] = [
     ),
   },
   { key: "college", header: "College", render: (r) => <span className="text-xs text-adm-muted">{r.college}</span> },
-  { key: "domainId", header: "Domain", render: (r) => <span className="text-xs font-medium">{domainLabel[r.domainId]}</span> },
+  { key: "domainId", header: "Domain", render: (r) => <span className="text-xs font-medium">{domainLabel[r.domainId] || r.domainId || "General"}</span> },
   { key: "status", header: "Status", sortable: true, render: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge> },
   { key: "paymentStatus", header: "Payment", render: (r) => <Badge tone={statusTone(r.paymentStatus)}>{r.paymentStatus}</Badge> },
   {

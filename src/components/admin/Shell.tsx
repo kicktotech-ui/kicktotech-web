@@ -45,7 +45,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const crumbs = pathname.split("/").filter(Boolean);
 
   return (
-    <div className={cn("ktt-admin flex min-h-screen bg-adm-bg text-adm-fg antialiased", resolved === "dark" && "dark")}>
+    <div suppressHydrationWarning className={cn("ktt-admin flex min-h-screen bg-adm-bg text-adm-fg antialiased", resolved === "dark" && "dark")}>
       {/* Sidebar (desktop) */}
       <aside className={cn("sticky top-0 hidden h-screen flex-shrink-0 flex-col border-r border-adm-border bg-adm-surface transition-[width] duration-200 lg:flex", collapsed ? "w-[68px]" : "w-64")}>
         <SidebarInner collapsed={collapsed} isActive={isActive} />

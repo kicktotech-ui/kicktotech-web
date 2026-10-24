@@ -115,6 +115,7 @@ export function CommunityPulse() {
                 alt={n.name}
                 width={n.size}
                 height={n.size}
+                priority={i < 5}
                 className="h-full w-full object-cover"
                 style={{ objectPosition: n.pos }}
               />

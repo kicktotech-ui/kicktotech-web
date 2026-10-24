@@ -52,11 +52,15 @@ export const domains: Domain[] = [
   { id: "cybersecurity", title: "Cybersecurity", slug: "cybersecurity", accent: "#16a34a", description: "Defend systems and think like an attacker with practical security labs.", priceRupees: 222, originalPriceRupees: 999, durationLabel: "5 Weeks", enrolled: 0, completionRate: 0, roadmap: roadmap("cybersecurity"), resources: [] },
 ];
 
-export const domainLabel: Record<DomainSlug, string> = {
+export const domainLabel: Record<string, string> = {
   python: "Python (AI + Projects)",
   java: "Java Development",
   "data-analytics": "Data Analytics",
   cybersecurity: "Cybersecurity",
+  fullstack: "Full Stack Development",
+  hackathon: "PromptWars Hackathon",
+  promptwars: "PromptWars Hackathon",
+  general: "General Program",
 };
 
 // ---- Record collections — EMPTY until the backend is connected -------------

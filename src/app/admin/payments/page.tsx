@@ -15,7 +15,7 @@ const columns: Column<Payment>[] = [
   { key: "paymentId", header: "Payment ID", render: (r) => <span className="font-mono text-xs text-adm-muted">{r.paymentId}</span> },
   { key: "internName", header: "Intern", sortable: true, render: (r) => <div><p className="font-medium text-adm-fg">{r.internName}</p><p className="font-mono text-[11px] text-adm-muted">{r.internRef}</p></div> },
   { key: "amountRupees", header: "Amount", sortable: true, render: (r) => <span className="font-semibold">{formatINR(r.amountRupees)}</span> },
-  { key: "domainId", header: "Domain", render: (r) => <span className="text-xs">{domainLabel[r.domainId].split(" ")[0]}</span> },
+  { key: "domainId", header: "Domain", render: (r) => <span className="text-xs">{(r.domainId && domainLabel[r.domainId]?.split(" ")[0]) || r.domainId || "General"}</span> },
   { key: "method", header: "Method", render: (r) => <span className="text-xs text-adm-muted">{r.method}</span> },
   { key: "status", header: "Status", render: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge> },
   { key: "date", header: "Date", sortable: true, render: (r) => <span className="text-xs text-adm-muted">{formatDate(r.date)}</span> },

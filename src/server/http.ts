@@ -74,14 +74,28 @@ export function route(handler: (req: Request, ctx: { requestId: string; params?:
       if (err instanceof ZodError) {
         return fail("VALIDATION_ERROR", "Invalid request.", err.flatten(), requestId);
       }
-      // Firestore quota / rate-limit (RESOURCE_EXHAUSTED) → honest 429 so the UI
-      // can tell the user the data source is throttled, not "disconnected".
+      // Rate limit / Resource exhausted
       const code = (err as { code?: number | string })?.code;
       if (code === 8 || code === 429) {
-        console.error(`[api] ${requestId} Firestore quota/rate limit (RESOURCE_EXHAUSTED)`);
+        console.error(`[api] ${requestId} Rate limit / quota reached`);
         return fail(
           "RATE_LIMITED",
-          "The Firebase project's read quota is currently exhausted. Live data is temporarily unavailable — it resets when the daily Firestore quota rolls over (midnight US Pacific), or upgrade the project to the Blaze plan.",
+          "Database request limit reached. Please try again shortly.",
+          undefined,
+          requestId,
+        );
+      }
+      // MongoDB Atlas IP Whitelist / TLS Rejection Error
+      const errMsg = (err as Error)?.message || "";
+      if (
+        errMsg.includes("SSL alert number 80") ||
+        errMsg.includes("tlsv1 alert internal error") ||
+        errMsg.includes("MongoServerSelectionError")
+      ) {
+        console.error(`[api] ${requestId} MongoDB Atlas connection blocked by IP whitelist:`, err);
+        return fail(
+          "SERVICE_UNAVAILABLE",
+          "Database connection blocked: Your current IP is not whitelisted in MongoDB Atlas. Please add 0.0.0.0/0 in MongoDB Atlas -> Network Access.",
           undefined,
           requestId,
         );

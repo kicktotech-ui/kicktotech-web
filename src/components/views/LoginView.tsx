@@ -3,27 +3,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff, Loader2, ShieldAlert, ArrowRight, Mail, RefreshCw } from "lucide-react";
+import { Eye, EyeOff, Loader2, ShieldAlert, ArrowRight } from "lucide-react";
 import { useAuth } from "@/components/providers";
 import { isAdminEmail } from "@/lib/authRules";
-import {
-  firebaseSignIn,
-  firebaseRefreshUser,
-  firebaseSendVerificationEmail,
-  firebaseLogout,
-} from "@/lib/firebase/firebaseAuth";
 import { AuthShell } from "@/components/layout/AuthShell";
 import { FormField, Input } from "@/components/forms/fields";
 import { Button } from "@/components/ui/Button";
 
 /* ============================================================================
-   LoginView — REAL Firebase Authentication login.
-
-   Flow:
-     1. signInWithEmailAndPassword()
-     2. reload() → check emailVerified
-     3. If !emailVerified → show verification-required panel
-     4. If emailVerified → load profile → redirect to dashboard
+   LoginView — Native Session & MongoDB student login.
    ========================================================================== */
 
 export function LoginView() {
@@ -43,20 +31,11 @@ export function LoginView() {
   const [error, setError] = useState<string | null>(null);
   const [adminBlocked, setAdminBlocked] = useState(false);
 
-  // Verification-required state
-  const [needsVerification, setNeedsVerification] = useState(false);
-  const [resendCooldown, setResendCooldown] = useState(0);
-  const [resendLoading, setResendLoading] = useState(false);
-  const [resendMessage, setResendMessage] = useState<string | null>(null);
-
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setAdminBlocked(false);
-    setNeedsVerification(false);
-    setResendMessage(null);
 
-    // UX-only admin separation
     if (isAdminEmail(email)) {
       setAdminBlocked(true);
       return;
@@ -64,141 +43,33 @@ export function LoginView() {
 
     setLoading(true);
 
-    // 1. Sign in with Firebase
-    const signInResult = await firebaseSignIn(email, password);
-    if (!signInResult.success || !signInResult.user) {
-      setLoading(false);
-      setError(signInResult.error ?? "Login failed. Please check your details.");
-      return;
-    }
+    try {
+      const res = await fetch("/api/v1/auth/student/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-    // 2. Reload user to get fresh emailVerified status
-    const { emailVerified } = await firebaseRefreshUser();
+      const body = await res.json();
+      if (!res.ok || !body.success) {
+        setLoading(false);
+        const errMsg =
+          typeof body?.error === "string"
+            ? body.error
+            : body?.error?.message || "Login failed. Please check your credentials.";
+        setError(errMsg);
+        return;
+      }
 
-    // 3. Check verification
-    if (!emailVerified) {
-      setLoading(false);
-      setNeedsVerification(true);
-      return;
-    }
-
-    // 4. Verified — refresh auth context and redirect
-    await refresh();
-    setLoading(false);
-    router.push(redirect);
-  }
-
-  async function handleResend() {
-    if (resendCooldown > 0 || resendLoading) return;
-    setResendLoading(true);
-    setResendMessage(null);
-
-    const result = await firebaseSendVerificationEmail();
-    setResendLoading(false);
-
-    if (result.success) {
-      setResendMessage("Verification email sent. Check your inbox and spam folder.");
-      setResendCooldown(45);
-      const timer = setInterval(() => {
-        setResendCooldown((c) => {
-          if (c <= 1) {
-            clearInterval(timer);
-            return 0;
-          }
-          return c - 1;
-        });
-      }, 1000);
-    } else {
-      setResendMessage(result.error ?? "Failed to send verification email.");
-    }
-  }
-
-  async function handleCheckVerification() {
-    setLoading(true);
-    const { emailVerified } = await firebaseRefreshUser();
-    if (emailVerified) {
       await refresh();
-      router.push(redirect);
-    } else {
       setLoading(false);
-      setResendMessage("Email not yet verified. Please check your inbox.");
+      router.push(redirect);
+    } catch (err) {
+      setLoading(false);
+      setError((err as Error)?.message || "Network error. Please try again.");
     }
   }
 
-  async function handleUseAnother() {
-    await firebaseLogout();
-    setNeedsVerification(false);
-    setEmail("");
-    setPassword("");
-    setError(null);
-    setResendMessage(null);
-  }
-
-  // --- VERIFICATION REQUIRED PANEL ---
-  if (needsVerification) {
-    return (
-      <AuthShell
-        eyebrow="Student Portal"
-        title="Email verification required"
-        subtitle="Your account exists, but your email hasn't been verified yet."
-      >
-        <div className="space-y-5">
-          <div className="flex items-center gap-3 rounded-xl border border-accent/20 bg-accent/5 p-4">
-            <Mail className="h-5 w-5 flex-shrink-0 text-accent" />
-            <div className="text-sm">
-              <p className="font-medium text-primary-foreground/90">Verification link sent to:</p>
-              <p className="mt-0.5 font-mono text-xs text-muted">{email}</p>
-            </div>
-          </div>
-
-          <Button
-            className="w-full"
-            size="lg"
-            onClick={handleCheckVerification}
-            disabled={loading}
-          >
-            {loading ? (
-              <><Loader2 className="h-4 w-4 animate-spin" /> Checking…</>
-            ) : (
-              "I've verified my email"
-            )}
-          </Button>
-
-          <div className="text-center">
-            <button
-              onClick={handleResend}
-              disabled={resendCooldown > 0 || resendLoading}
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-accent transition-colors hover:text-accent/80 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {resendLoading ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3.5 w-3.5" />
-              )}
-              {resendCooldown > 0
-                ? `Resend available in ${resendCooldown}s`
-                : "Resend verification email"}
-            </button>
-          </div>
-
-          {resendMessage && (
-            <p className="text-center text-xs text-accent/80">{resendMessage}</p>
-          )}
-
-          <div className="border-t border-line pt-4 text-center">
-            <button
-              onClick={handleUseAnother}
-              className="text-sm font-medium text-muted transition-colors hover:text-primary-foreground"
-            >
-              Use another account
-            </button>
-          </div>
-        </div>
-      </AuthShell>
-    );
-  }
-
-  // --- NORMAL LOGIN FORM ---
   return (
     <AuthShell
       eyebrow="Student Portal"

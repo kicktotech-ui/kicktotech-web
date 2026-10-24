@@ -22,7 +22,7 @@ export function CroppedSignature({ src, alt, className, style }: { src: string; 
     
     const img = new Image();
     if (!isDataUrl && !isLocal) {
-      img.crossOrigin = "anonymous"; // Required for Firebase Storage images to allow canvas read
+      img.crossOrigin = "anonymous"; // Required for cross-origin storage images (Supabase Storage, CDN) to allow canvas read
     }
     
     img.onload = () => {

@@ -1,8 +1,8 @@
 import { AppError } from "../http";
 import { readSession } from "./session";
 import { hasPermission, isAdminRole, type Permission } from "../rbac";
-import type { UserRecord, AdminRole } from "../data";
-import { getAdminAuth, isAdminConfigured } from "../firebase/admin";
+import { getStore, type UserRecord, type AdminRole } from "../data";
+import { unsign } from "../crypto";
 
 /**
  * Authorization guards. Enforced entirely server-side from the authenticated
@@ -20,29 +20,32 @@ export interface AuthenticatedStudent {
  * Validates the authenticated student session for protected student endpoints.
  *
  * Checks:
- *  1. Bearer token in Authorization header (verified via Firebase Admin SDK)
+ *  1. Bearer signed token in Authorization header
  *  2. Server session cookie (via readSession)
  *
  * Throws UNAUTHENTICATED (HTTP 401) if neither is valid.
  */
 export async function requireAuthenticatedStudent(req: Request): Promise<AuthenticatedStudent> {
-  // 1. Check Firebase ID Token from Authorization header
+  // 1. Check Bearer token from Authorization header
   const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
   if (authHeader?.startsWith("Bearer ")) {
-    const idToken = authHeader.substring(7).trim();
-    if (idToken && isAdminConfigured()) {
-      try {
-        const adminAuth = await getAdminAuth();
-        const decoded = await adminAuth.verifyIdToken(idToken);
-        if (decoded && decoded.email) {
-          return {
-            id: decoded.uid,
-            email: decoded.email.toLowerCase().trim(),
-            name: (decoded.name as string) || undefined,
-          };
+    const rawToken = authHeader.substring(7).trim();
+    if (rawToken) {
+      const sessionId = unsign(rawToken);
+      if (sessionId) {
+        const store = getStore();
+        const session = await store.getSessionById(sessionId);
+        if (session && session.type === "student" && Date.now() <= new Date(session.expiresAt).getTime()) {
+          const user = await store.getUserById(session.userId);
+          if (user && user.status === "active") {
+            return {
+              id: user.id,
+              email: user.email.toLowerCase().trim(),
+              name: user.name,
+              role: user.role,
+            };
+          }
         }
-      } catch (err) {
-        console.warn("[guard] Firebase ID token verification failed:", err);
       }
     }
   }

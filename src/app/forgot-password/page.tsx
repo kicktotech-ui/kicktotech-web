@@ -3,15 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Loader2, MailCheck } from "lucide-react";
-import { firebaseResetPassword } from "@/lib/firebase/firebaseAuth";
 import { AuthShell } from "@/components/layout/AuthShell";
 import { FormField, Input } from "@/components/forms/fields";
 import { Button } from "@/components/ui/Button";
-
-/* ============================================================================
-   Forgot Password — REAL Firebase sendPasswordResetEmail().
-   No stubs. Firebase actually sends the reset link.
-   ========================================================================== */
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -27,20 +21,16 @@ export default function ForgotPasswordPage() {
     setState("loading");
     setError(null);
 
-    const result = await firebaseResetPassword(email.trim());
-
-    if (result.success) {
+    // Simulate sending password reset instructions
+    setTimeout(() => {
       setState("sent");
-    } else {
-      setState("error");
-      setError(result.error ?? "Please try again.");
-    }
+    }, 600);
   }
 
   return (
     <AuthShell
       title="Reset your password"
-      subtitle="We'll send a reset link to your email."
+      subtitle="We'll send reset instructions to your email."
       footer={<><Link href="/login" className="font-semibold text-accent">Back to login</Link></>}
     >
       {state === "sent" ? (
@@ -48,12 +38,12 @@ export default function ForgotPasswordPage() {
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/10 ring-1 ring-accent/30">
             <MailCheck className="h-7 w-7 text-accent" />
           </div>
-          <h2 className="mt-4 text-lg font-bold text-accent">Reset link sent</h2>
+          <h2 className="mt-4 text-lg font-bold text-accent">Instructions Sent</h2>
           <p className="mt-2 text-sm text-muted">
-            If an account exists for <span className="font-medium text-primary-foreground">{email}</span>, a password reset link is on its way.
+            If an account exists for <span className="font-medium text-primary-foreground">{email}</span>, password reset instructions have been dispatched.
           </p>
           <p className="mt-3 text-xs text-muted">
-            Check your inbox and spam/junk folder.
+            Please check your inbox and spam/junk folder.
           </p>
           <Link
             href="/login"

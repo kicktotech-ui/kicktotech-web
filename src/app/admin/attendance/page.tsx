@@ -12,7 +12,7 @@ import { formatDate } from "@/lib/utils";
 const columns: Column<AttendanceRecord>[] = [
   { key: "internName", header: "Intern", sortable: true, render: (r) => <div><p className="font-medium text-adm-fg">{r.internName}</p><p className="font-mono text-[11px] text-adm-muted">{r.internId}</p></div> },
   { key: "sessionTitle", header: "Session", render: (r) => <span className="text-sm text-adm-muted">{r.sessionTitle}</span> },
-  { key: "domainId", header: "Domain", render: (r) => <span className="text-xs">{domainLabel[r.domainId].split(" ")[0]}</span> },
+  { key: "domainId", header: "Domain", render: (r) => <span className="text-xs">{(r.domainId && domainLabel[r.domainId]?.split(" ")[0]) || r.domainId || "General"}</span> },
   { key: "date", header: "Date", sortable: true, render: (r) => <span className="text-xs text-adm-muted">{formatDate(r.date)}</span> },
   { key: "state", header: "Attendance", render: (r) => <Badge tone={statusTone(r.state)}>{r.state}</Badge> },
 ];

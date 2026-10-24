@@ -89,11 +89,7 @@ export const config = {
   cookieSecure: isProd, // Secure flag only over HTTPS in prod; off on localhost
 
   /**
-   * Selects the data backend. Defaults to the in-memory store so local dev and
-   * builds keep working with zero external dependencies and NO risk of writing
-   * to real Firebase. Set DATA_BACKEND=firebase only after the Firebase Admin
-   * service account AND the real Firestore collection names/schema are
-   * confirmed (see src/server/data/firebase adapter — pending).
+   * Selects the data backend. Supports "mongodb" or "memory".
    */
-  dataBackend: (process.env.DATA_BACKEND ?? "memory") as "memory" | "firebase",
+  dataBackend: (process.env.DATA_BACKEND ?? (process.env.MONGODB_URI ? "mongodb" : "memory")) as "memory" | "mongodb",
 } as const;

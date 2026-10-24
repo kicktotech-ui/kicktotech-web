@@ -6,30 +6,17 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Loader2, GraduationCap, Building2, Eye, EyeOff } from "lucide-react";
 import { isAdminEmail } from "@/lib/authRules";
-import { firebaseSignUp, firebaseSendVerificationEmail } from "@/lib/firebase/firebaseAuth";
-import { createStudentProfile } from "@/lib/firebase/firestore";
+import { useAuth } from "@/components/providers";
 import { AuthShell } from "@/components/layout/AuthShell";
 import { FormField, Input } from "@/components/forms/fields";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 
-/* ============================================================================
-   SignupView — REAL Firebase Authentication registration.
-
-   Flow:
-     Step 1: Name + Email + Password
-     Step 2: Role (Student / Company)
-     Step 3: Phone + College/Company
-     → createUserWithEmailAndPassword()
-     → createStudentProfile() in Firestore
-     → sendEmailVerification()
-     → redirect to /verify-email
-   ========================================================================== */
-
 type Role = "student" | "company";
 
 export function SignupView() {
   const router = useRouter();
+  const { refresh } = useAuth();
   const [step, setStep] = useState(0);
   const [role, setRole] = useState<Role>("student");
   const [account, setAccount] = useState({ name: "", email: "", password: "" });
@@ -77,41 +64,39 @@ export function SignupView() {
     setLoading(true);
     setError(null);
 
-    // 1. Create Firebase Authentication account
-    const authResult = await firebaseSignUp(account.email, account.password);
-    if (!authResult.success || !authResult.user) {
+    try {
+      const res = await fetch("/api/v1/auth/student/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: account.name.trim(),
+          email: account.email.trim().toLowerCase(),
+          password: account.password,
+          role,
+          phone: extra.phone.trim() || undefined,
+          college: role === "student" ? extra.college.trim() : undefined,
+          company: role === "company" ? extra.company.trim() : undefined,
+        }),
+      });
+
+      const body = await res.json();
+      if (!res.ok || !body.success) {
+        setLoading(false);
+        const errMsg =
+          typeof body?.error === "string"
+            ? body.error
+            : body?.error?.message || "Registration failed. Please check your information.";
+        setError(errMsg);
+        return;
+      }
+
+      await refresh();
       setLoading(false);
-      setError(authResult.error ?? "Could not create account.");
-      return;
+      router.push("/hackathon/register");
+    } catch (err) {
+      setLoading(false);
+      setError((err as Error)?.message || "Network error. Please try again.");
     }
-
-    const uid = authResult.user.uid;
-
-    // 2. Create Firestore student profile (NO password stored)
-    const profileCreated = await createStudentProfile(uid, {
-      fullName: account.name.trim(),
-      email: account.email.trim().toLowerCase(),
-      phone: extra.phone.trim(),
-      college: role === "student" ? extra.college.trim() : undefined,
-      company: role === "company" ? extra.company.trim() : undefined,
-      role,
-    });
-
-    if (!profileCreated) {
-      // Auth account was created but profile failed — still proceed
-      console.error("Student profile creation failed, but auth account exists");
-    }
-
-    // 3. Send Firebase email verification
-    const verifyResult = await firebaseSendVerificationEmail();
-    if (!verifyResult.success) {
-      console.error("Failed to send verification email:", verifyResult.error);
-    }
-
-    setLoading(false);
-
-    // 4. Redirect to verification screen (NOT dashboard)
-    router.push("/verify-email");
   }
 
   return (
@@ -121,36 +106,49 @@ export function SignupView() {
       subtitle="Join Pune's student tech community."
       footer={<>Already have an account? <Link href="/login" className="font-semibold text-accent">Sign in</Link></>}
     >
-      {/* progress */}
-      <div className="mb-2 flex items-center justify-between text-xs font-medium text-muted">
-        <span>Step {step + 1} of 3</span>
-        <span>{["Account", "Role", "Details"][step]}</span>
-      </div>
-      <div className="mb-7 flex gap-1.5">
-        {[0, 1, 2].map((i) => (
-          <span key={i} className={cn("h-1.5 flex-1 rounded-full transition-colors duration-300", i <= step ? "bg-accent" : "bg-line")} />
-        ))}
-      </div>
+      <div className="space-y-6">
+        <div className="flex items-center gap-2">
+          {[0, 1, 2].map((s) => (
+            <div
+              key={s}
+              className={cn(
+                "h-1 flex-1 rounded-full transition-colors",
+                s <= step ? "bg-accent" : "bg-line",
+              )}
+            />
+          ))}
+        </div>
 
-      <motion.div key={step} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }}>
-        {/* STEP 1: Account */}
         {step === 0 && (
-          <div className="space-y-4">
-            <FormField label="Full name" htmlFor="s-name" error={account.name.length > 0 && !nameValid ? "Enter at least 2 characters." : undefined}>
-              <Input id="s-name" value={account.name} onChange={(e) => setAccount({ ...account, name: e.target.value })} placeholder="Your name" autoComplete="name" />
+          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-5">
+            <FormField label="Full Name" htmlFor="signup-name">
+              <Input
+                id="signup-name"
+                value={account.name}
+                onChange={(e) => setAccount({ ...account, name: e.target.value })}
+                placeholder="Mayur Patil"
+                required
+              />
             </FormField>
-            <FormField label="Email" htmlFor="s-email" error={account.email.length > 0 && !emailValid ? "Enter a valid email address." : undefined}>
-              <Input id="s-email" type="email" value={account.email} onChange={(e) => setAccount({ ...account, email: e.target.value })} placeholder="you@example.com" autoComplete="email" />
+            <FormField label="Email" htmlFor="signup-email">
+              <Input
+                id="signup-email"
+                type="email"
+                value={account.email}
+                onChange={(e) => setAccount({ ...account, email: e.target.value })}
+                placeholder="you@example.com"
+                required
+              />
             </FormField>
-            <FormField label="Password" htmlFor="s-pass" hint="At least 6 characters.">
+            <FormField label="Password" htmlFor="signup-password">
               <div className="relative">
                 <Input
-                  id="s-pass"
+                  id="signup-password"
                   type={showPassword ? "text" : "password"}
                   value={account.password}
                   onChange={(e) => setAccount({ ...account, password: e.target.value })}
-                  placeholder="••••••••"
-                  autoComplete="new-password"
+                  placeholder="At least 6 characters"
+                  required
                   className="pr-11"
                 />
                 <button
@@ -163,61 +161,96 @@ export function SignupView() {
                 </button>
               </div>
             </FormField>
-            {error && (
-              <div role="alert" className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-300">
-                {error} <Link href="/admin/login" className="font-semibold text-accent hover:underline">Admin Login →</Link>
-              </div>
-            )}
-            <Button className="mt-2 w-full" size="lg" onClick={goToRole} disabled={!accountValid}>Continue</Button>
-          </div>
+            {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
+            <Button className="w-full" size="lg" disabled={!accountValid} onClick={goToRole}>
+              Next: Select Role
+            </Button>
+          </motion.div>
         )}
 
-        {/* STEP 2: Role */}
         {step === 1 && (
-          <div className="space-y-5">
-            <p className="text-sm font-medium text-primary-foreground/90">I am a</p>
+          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-5">
+            <p className="text-sm text-muted">Select how you want to engage with Kick To Tech:</p>
             <div className="grid grid-cols-2 gap-3">
-              {([["student", GraduationCap, "Student"], ["company", Building2, "Company"]] as const).map(([value, Icon, label]) => (
+              {[
+                { r: "student" as Role, label: "Student", icon: GraduationCap, desc: "Internships, workshops & hackathons" },
+                { r: "company" as Role, label: "Company", icon: Building2, desc: "Hire talent & collaborate" },
+              ].map(({ r, label, icon: Icon, desc }) => (
                 <button
-                  key={value}
+                  key={r}
                   type="button"
-                  onClick={() => setRole(value)}
-                  aria-pressed={role === value}
-                  className={cn("flex flex-col items-center gap-2.5 rounded-2xl border p-6 transition-all duration-300", role === value ? "border-accent bg-accent/10 shadow-glow" : "border-line hover:-translate-y-0.5 hover:border-accent/40")}
+                  onClick={() => setRole(r)}
+                  className={cn(
+                    "rounded-xl border p-4 text-left transition-all",
+                    role === r
+                      ? "border-accent bg-accent/10 shadow-lg shadow-accent/5"
+                      : "border-line bg-surface/50 hover:border-line-strong",
+                  )}
                 >
-                  <Icon className={cn("h-7 w-7 transition-colors", role === value ? "text-accent" : "text-muted")} />
-                  <span className="text-sm font-semibold">{label}</span>
+                  <Icon className={cn("h-6 w-6 mb-2", role === r ? "text-accent" : "text-muted")} />
+                  <p className="font-semibold text-primary-foreground">{label}</p>
+                  <p className="mt-1 text-xs text-muted leading-relaxed">{desc}</p>
                 </button>
               ))}
             </div>
-            <Button className="w-full" size="lg" onClick={goToDetails}>Continue</Button>
-            <button type="button" onClick={() => setStep(0)} className="mx-auto block text-sm font-medium text-muted transition-colors hover:text-accent">Back</button>
-          </div>
+            {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
+            <div className="flex gap-3">
+              <Button variant="outline" className="w-1/3" onClick={() => setStep(0)}>
+                Back
+              </Button>
+              <Button className="flex-1" size="lg" onClick={goToDetails}>
+                Next: Your Details
+              </Button>
+            </div>
+          </motion.div>
         )}
 
-        {/* STEP 3: Details */}
         {step === 2 && (
-          <div className="space-y-4">
-            <FormField label="Phone" htmlFor="s-phone" error={extra.phone.length > 0 && !phoneValid ? "Enter a valid phone number." : undefined}>
-              <Input id="s-phone" value={extra.phone} onChange={(e) => setExtra({ ...extra, phone: e.target.value })} placeholder="+91 98765 43210" autoComplete="tel" />
+          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-5">
+            <FormField label="Phone Number" htmlFor="signup-phone">
+              <Input
+                id="signup-phone"
+                type="tel"
+                value={extra.phone}
+                onChange={(e) => setExtra({ ...extra, phone: e.target.value })}
+                placeholder="+91 98765 43210"
+                required
+              />
             </FormField>
-            {role === "student" ? (
-              <FormField label="College" htmlFor="s-college" error={extra.college.length > 0 && !collegeValid ? "Enter a valid college name (at least 3 characters)." : undefined}>
-                <Input id="s-college" value={extra.college} onChange={(e) => setExtra({ ...extra, college: e.target.value })} placeholder="Your college or university" />
+            {role === "student" && (
+              <FormField label="College / University" htmlFor="signup-college">
+                <Input
+                  id="signup-college"
+                  value={extra.college}
+                  onChange={(e) => setExtra({ ...extra, college: e.target.value })}
+                  placeholder="e.g. JSPM University, Pune"
+                  required
+                />
               </FormField>
-            ) : (
-              <FormField label="Company" htmlFor="s-company" error={extra.company.length > 0 && !companyValid ? "Enter a valid company name." : undefined}>
-                <Input id="s-company" value={extra.company} onChange={(e) => setExtra({ ...extra, company: e.target.value })} placeholder="Your company" />
+            )}
+            {role === "company" && (
+              <FormField label="Company Name" htmlFor="signup-company">
+                <Input
+                  id="signup-company"
+                  value={extra.company}
+                  onChange={(e) => setExtra({ ...extra, company: e.target.value })}
+                  placeholder="e.g. Acme Tech Solutions"
+                  required
+                />
               </FormField>
             )}
             {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
-            <Button className="mt-2 w-full" size="lg" onClick={submit} disabled={loading || !detailsValid}>
-              {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Creating account…</> : "Create account"}
-            </Button>
-            <button type="button" onClick={() => setStep(1)} className="mx-auto block text-sm font-medium text-muted transition-colors hover:text-accent">Back</button>
-          </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="w-1/3" onClick={() => setStep(1)} disabled={loading}>
+                Back
+              </Button>
+              <Button className="flex-1" size="lg" disabled={!detailsValid || loading} onClick={submit}>
+                {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Creating account…</> : "Create Account"}
+              </Button>
+            </div>
+          </motion.div>
         )}
-      </motion.div>
+      </div>
     </AuthShell>
   );
 }

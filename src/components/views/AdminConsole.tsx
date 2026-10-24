@@ -75,7 +75,7 @@ export function AdminConsole() {
           <EmptyState
             title={`${tabs.find((t) => t.key === tab)?.label} are backend-driven`}
             icon={<Database className="h-7 w-7" />}
-            description="This collection will populate once the service layer is connected to Firebase/API. The table UI, search, pagination, and export are ready."
+            description="This collection will populate once the service layer is connected to the database. The table UI, search, pagination, and export are ready."
           />
         </Card>
       )}

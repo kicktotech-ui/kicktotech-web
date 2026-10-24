@@ -57,7 +57,7 @@ export default function AdminDashboardPage() {
           <p className="text-xs font-semibold uppercase tracking-widest text-[#0057ff]">Kick To Tech Operations</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-adm-fg">{greeting()}, {admin?.name}.</h1>
           <p className="mt-1 flex items-center gap-2 text-sm text-adm-muted">
-            {conn === "loading" && <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 animate-pulse rounded-full bg-[#f5c400]" /> Connecting to Firebase…</span>}
+            {conn === "loading" && <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 animate-pulse rounded-full bg-[#f5c400]" /> Connecting to Database…</span>}
             {conn === "live" && <span className="inline-flex items-center gap-1.5 font-medium text-[#16a34a]"><span className="h-2 w-2 rounded-full bg-[#16a34a]" /> Live</span>}
             {conn === "degraded" && <span className="inline-flex items-center gap-1.5 font-medium text-[#d97706]"><span className="h-2 w-2 rounded-full bg-[#d97706]" /> Degraded · data service rate-limited</span>}
             {conn === "offline" && <span className="inline-flex items-center gap-1.5 font-medium text-[#dc2626]"><span className="h-2 w-2 rounded-full bg-[#dc2626]" /> Offline</span>}

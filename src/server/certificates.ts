@@ -1,5 +1,4 @@
 import { getStore, type CertificateRecord } from "./data";
-import { firebaseStore } from "./data/firebase";
 import { certificateId as makeCertId } from "./crypto";
 import { verificationUrlFor } from "./config";
 import { writeAudit } from "./audit";
@@ -150,13 +149,7 @@ export async function verifyCertificate(certificateId: string): Promise<PublicVe
   const id = certificateId.trim();
   if (!id) return { found: false };
 
-  let cert: CertificateRecord | null = null;
-  try {
-    cert = await firebaseStore().getCertificateByCertId(id);
-  } catch {
-    cert = null; // Firebase unavailable / quota — fall through to session store
-  }
-  if (!cert) cert = await getStore().getCertificateByCertId(id);
+  const cert = await getStore().getCertificateByCertId(id);
   if (!cert) return { found: false };
 
   return {

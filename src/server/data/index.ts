@@ -1,18 +1,13 @@
 import { uuid } from "../crypto";
 import { config } from "../config";
-import { createFirebaseStore } from "./firebase";
-import { isAdminConfigured } from "../firebase/admin";
+import { createMongoStore } from "./mongodb";
 
 /**
- * Data layer — entity types + an ASYNC, Firestore-friendly DataStore interface.
+ * Data layer — entity types + an ASYNC DataStore interface.
  *
- * Two implementations:
- *  - MemoryDataStore  → local dev / tests (explicit, chosen via DATA_BACKEND=memory)
- *  - FirebaseDataStore→ real Cloud Firestore (DATA_BACKEND=firebase)
- *
- * There is NO silent fallback: if DATA_BACKEND=firebase and Firebase is
- * unavailable/unconfigured, store methods throw — the UI shows a real error
- * state rather than fabricated data.
+ * Implementations:
+ *  - MongoDataStore   → MongoDB cluster (DATA_BACKEND=mongodb or MONGODB_URI configured)
+ *  - MemoryDataStore  → local dev / tests (DATA_BACKEND=memory)
  */
 
 // ---- Entity types ---------------------------------------------------------
@@ -407,19 +402,17 @@ class MemoryDataStore implements DataStore {
   async appendAudit(record: AuditRecord) { this.audits.push(record); }
 }
 
-// ---- Store selection (no silent fallback) ----------------------------------
+// ---- Store selection --------------------------------------------------------
 
 const globalRef = globalThis as unknown as { __kttStore?: DataStore; __kttBackend?: string };
 
 export function getStore(): DataStore {
-  const useFirebase = config.dataBackend === "firebase" || isAdminConfigured();
-  const effectiveBackend = useFirebase ? "firebase" : "memory";
+  const useMongo = config.dataBackend === "mongodb" || Boolean(process.env.MONGODB_URI && config.dataBackend !== "memory");
+  const effectiveBackend = useMongo ? "mongodb" : "memory";
   if (globalRef.__kttStore && globalRef.__kttBackend === effectiveBackend) {
     return globalRef.__kttStore;
   }
-  // createFirebaseStore is import-safe: the firebase-admin runtime is only
-  // dynamically imported inside getAdminDb() when a Firestore method is called.
-  const store: DataStore = useFirebase ? createFirebaseStore() : new MemoryDataStore();
+  const store: DataStore = useMongo ? createMongoStore() : new MemoryDataStore();
   globalRef.__kttStore = store;
   globalRef.__kttBackend = effectiveBackend;
   return store;

@@ -18,7 +18,7 @@ const columns: Column<Mentor>[] = [
       </div>
     ),
   },
-  { key: "domainIds", header: "Domains", render: (r) => <div className="flex flex-wrap gap-1">{r.domainIds.map((d) => <Badge key={d} tone="neutral">{domainLabel[d].split(" ")[0]}</Badge>)}</div> },
+  { key: "domainIds", header: "Domains", render: (r) => <div className="flex flex-wrap gap-1">{(r.domainIds || []).map((d) => <Badge key={d} tone="neutral">{(domainLabel[d]?.split(" ")[0]) || d || "General"}</Badge>)}</div> },
   { key: "skills", header: "Skills", render: (r) => <span className="text-xs text-adm-muted">{r.skills.join(", ")}</span> },
   { key: "experienceYears", header: "Exp", sortable: true, render: (r) => <span className="text-sm">{r.experienceYears} yrs</span> },
   { key: "assignedInterns", header: "Interns", sortable: true, render: (r) => <span className="text-sm font-semibold">{r.assignedInterns}</span> },

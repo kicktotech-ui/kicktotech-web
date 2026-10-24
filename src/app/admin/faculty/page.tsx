@@ -12,7 +12,7 @@ const columns: Column<Faculty>[] = [
   { key: "name", header: "Faculty", sortable: true, render: (r) => <div><p className="font-semibold text-adm-fg">{r.name}</p><p className="text-xs text-adm-muted">{r.designation}</p></div> },
   { key: "department", header: "Department", render: (r) => <span className="text-sm text-adm-muted">{r.department}</span> },
   { key: "college", header: "College", render: (r) => <span className="text-xs text-adm-muted">{r.college}</span> },
-  { key: "domainIds", header: "Domains", render: (r) => <div className="flex flex-wrap gap-1">{r.domainIds.map((d) => <Badge key={d} tone="neutral">{domainLabel[d].split(" ")[0]}</Badge>)}</div> },
+  { key: "domainIds", header: "Domains", render: (r) => <div className="flex flex-wrap gap-1">{(r.domainIds || []).map((d) => <Badge key={d} tone="neutral">{(domainLabel[d]?.split(" ")[0]) || d || "General"}</Badge>)}</div> },
   { key: "status", header: "Status", render: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge> },
 ];
 

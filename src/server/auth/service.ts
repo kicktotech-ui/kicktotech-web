@@ -142,46 +142,7 @@ export async function loginAdmin(input: LoginInput, meta: { ip: string; requestI
     return publicUser(admin);
   }
 
-  // 2. Firebase Auth verification (if admin user exists in Firebase Auth)
-  const firebaseApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY;
-  if (firebaseApiKey && (normEmail === config.admin.email || isReservedAdminEmail(normEmail))) {
-    try {
-      const fbRes = await fetch(
-        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseApiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: normEmail, password: input.password, returnSecureToken: true }),
-        },
-      );
-      if (fbRes.ok) {
-        const fbData = (await fbRes.json()) as { localId?: string; displayName?: string };
-        let admin = await store.findUserByEmail(normEmail);
-        if (!admin) {
-          const { salt, hash } = hashPassword(input.password);
-          admin = await store.createUser({
-            id: fbData.localId || store.newId(),
-            type: "admin",
-            role: "SUPER_ADMIN",
-            name: fbData.displayName || "Administrator",
-            email: normEmail,
-            passwordSalt: salt,
-            passwordHash: hash,
-            status: "active",
-            createdAt: nowIso(),
-            updatedAt: nowIso(),
-          });
-        }
-        await createSession("admin", admin);
-        await writeAudit({ actor: admin.email, action: "ADMIN_LOGIN", target: admin.id, requestId: meta.requestId, ip: meta.ip });
-        return publicUser(admin);
-      }
-    } catch (fbErr) {
-      console.warn("[auth] Firebase Auth verification error:", fbErr);
-    }
-  }
-
-  // 3. Stored Database PBKDF2 Password Verification
+  // 2. Stored Database PBKDF2 Password Verification
   await ensureAdminBootstrap();
   const admin = await store.findUserByEmail(normEmail);
 

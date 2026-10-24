@@ -22,23 +22,29 @@ function systemPrefersDark(): boolean {
 }
 
 export function AdminThemeProvider({ children }: { children: ReactNode }) {
-  // Lazy init from storage to minimize first-paint flash.
-  const [theme, setThemeState] = useState<ThemePref>(() => {
-    if (typeof window === "undefined") return "system";
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-    return saved === "light" || saved === "dark" || saved === "system" ? saved : "system";
-  });
-  const [systemDark, setSystemDark] = useState<boolean>(() => systemPrefersDark());
+  const [mounted, setMounted] = useState(false);
+  const [theme, setThemeState] = useState<ThemePref>("system");
+  const [systemDark, setSystemDark] = useState<boolean>(false);
 
-  // Track OS theme when in "system" mode.
   useEffect(() => {
+    setMounted(true);
+    try {
+      const saved = window.localStorage.getItem(STORAGE_KEY);
+      if (saved === "light" || saved === "dark" || saved === "system") {
+        setThemeState(saved);
+      }
+    } catch {
+      // storage unavailable
+    }
+
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    setSystemDark(mq.matches);
     const onChange = () => setSystemDark(mq.matches);
     mq.addEventListener?.("change", onChange);
     return () => mq.removeEventListener?.("change", onChange);
   }, []);
 
-  const resolved: ResolvedTheme = theme === "system" ? (systemDark ? "dark" : "light") : theme;
+  const resolved: ResolvedTheme = !mounted ? "light" : theme === "system" ? (systemDark ? "dark" : "light") : theme;
 
   const setTheme = useCallback((t: ThemePref) => {
     setThemeState(t);

@@ -90,7 +90,7 @@ function DashboardLoadingSkeleton() {
 }
 
 function DashboardContent() {
-  const { user, firebaseUser } = useAuth();
+  const { user } = useAuth();
   const searchParams = useSearchParams();
   const requestedTab = searchParams.get("tab");
 
@@ -106,10 +106,7 @@ function DashboardContent() {
     async function loadDashboard() {
       try {
         setLoading(true);
-        const token = await firebaseUser?.getIdToken().catch(() => null);
-        const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-
-        const res = await api.get<StudentDashboardResponse>("/student/dashboard", { headers });
+        const res = await api.get<StudentDashboardResponse>("/student/dashboard");
         if (active) {
           setData(res);
 
@@ -161,7 +158,7 @@ function DashboardContent() {
     return () => {
       active = false;
     };
-  }, [user, firebaseUser, requestedTab]);
+  }, [user, requestedTab]);
 
   function handleCopyKttId(id: string) {
     if (!id) return;

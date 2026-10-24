@@ -64,7 +64,7 @@ export default function InternProfilePage() {
     { icon: Mail, label: "Email", value: intern.email },
     { icon: Phone, label: "Phone", value: intern.phone },
     { icon: Building2, label: "College", value: intern.college },
-    { icon: GraduationCap, label: "Domain", value: domainLabel[intern.domainId] },
+    { icon: GraduationCap, label: "Domain", value: domainLabel[intern.domainId] || intern.domainId || "General" },
   ];
 
   return (
@@ -84,7 +84,7 @@ export default function InternProfilePage() {
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <Badge tone={statusTone(intern.status)}>{intern.status}</Badge>
                 <Badge tone={statusTone(intern.paymentStatus)}>{intern.paymentStatus}</Badge>
-                <Badge tone="neutral">{domainLabel[intern.domainId]}</Badge>
+                <Badge tone="neutral">{domainLabel[intern.domainId] || intern.domainId || "General"}</Badge>
               </div>
             </div>
           </div>
