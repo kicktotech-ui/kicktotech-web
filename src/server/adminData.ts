@@ -15,8 +15,15 @@ function escapeRegex(s: string): string {
 function iso(v: unknown): string {
   if (!v) return "";
   if (typeof v === "string") return v;
-  if (typeof v === "number") return new Date(v).toISOString();
-  if (typeof v === "object" && v instanceof Date) return v.toISOString();
+  if (typeof v === "number") return new Date(v > 1e11 ? v : v * 1000).toISOString();
+  if (typeof v === "object") {
+    if (v instanceof Date) return v.toISOString();
+    const obj = v as Record<string, unknown>;
+    const sec = obj.seconds ?? obj._seconds;
+    if (typeof sec === "number") {
+      return new Date(sec * 1000).toISOString();
+    }
+  }
   return "";
 }
 
@@ -79,13 +86,13 @@ const mapIntern = (id: string, d: Doc): Intern => ({
   email: str(d.email),
   phone: str(d.phone),
   college: str(d.college),
-  domainId: normalizeDomain(d.domain),
+  domainId: normalizeDomain(d.domain || d.domainTitle || d.domainId),
   status: internStatus(d.status),
   paymentStatus: payStatus(d.paymentStatus),
   certificateStatus: d.certificateId || d.certificate ? "ISSUED" : "NOT_READY",
   progress: Math.max(0, Math.min(100, num(d.progress))),
   mentorId: str(d.mentorId) || undefined,
-  joinedAt: iso(d.createdAt),
+  joinedAt: iso(d.createdAt) || iso(d._fbCreateTime) || iso(d.updatedAt) || new Date().toISOString(),
   avatarColor: color(id),
 });
 
@@ -99,7 +106,7 @@ const mapCert = (id: string, d: Doc): Certificate => ({
   program: str(d.program || d.courseTitle),
   grade: str(d.grade),
   status: certUiStatus(d.status),
-  issuedAt: iso(d.issuedAt) || undefined,
+  issuedAt: iso(d.issuedAt) || iso(d.createdAt) || iso(d._fbCreateTime) || undefined,
   durationLabel: str(d.durationLabel || d.duration),
 });
 
@@ -125,7 +132,7 @@ const mapActivation = (id: string, d: Doc): Activation => ({
   internEmail: d.email ? str(d.email) : undefined,
   domainId: normalizeDomain(d.domain),
   status: actStatus(d.status),
-  createdAt: iso(d.createdAt),
+  createdAt: iso(d.createdAt) || iso(d._fbCreateTime),
   expiresAt: iso(d.expiresAt),
   usedAt: d.usedAt ? iso(d.usedAt) : undefined,
 });
@@ -136,9 +143,34 @@ const mapNotification = (id: string, d: Doc): AdminNotification => ({
   message: str(d.message),
   type: notifType(d.type),
   target: "ALL",
-  createdAt: iso(d.createdAt),
+  createdAt: iso(d.createdAt) || iso(d._fbCreateTime),
   source: "ADMIN",
   delivered: num(d.delivered),
+});
+
+const mapActivity = (id: string, d: Doc): Record<string, unknown> => ({
+  id,
+  timestamp: iso(d.ts) || iso(d.createdAt) || iso(d._fbCreateTime) || new Date().toISOString(),
+  actor: str(d.actor || d.user || "system"),
+  action: str(d.action || d.type || "ACTIVITY"),
+  target: str(d.target || d.targetId || ""),
+  details: str(d.details || d.message || d.note || ""),
+  status: str(d.status || d.result || "SUCCESS"),
+  ip: str(d.ip || ""),
+});
+
+const mapUser = (id: string, d: Doc): Record<string, unknown> => ({
+  id,
+  uid: str(d.uid || d.id || id),
+  type: str(d.type || (d.role === "admin" || d.role === "SUPER_ADMIN" ? "admin" : "student")),
+  role: str(d.role || "student"),
+  name: str(d.name || "Student"),
+  email: str(d.email),
+  phone: str(d.phone),
+  college: str(d.college || (d.details && typeof d.details === "object" ? (d.details as any).college : "")),
+  company: str(d.company),
+  status: str(d.status || "active"),
+  createdAt: iso(d.createdAt) || iso(d._fbCreateTime) || new Date().toISOString(),
 });
 
 function appStatus(v: unknown, payment?: unknown): ApplicationStatus {
@@ -161,7 +193,7 @@ const mapApplication = (id: string, d: Doc): Application => ({
   college: str(d.college),
   domainId: normalizeDomain(d.domain),
   status: appStatus(d.status, d.paymentStatus),
-  appliedAt: iso(d.createdAt) || iso(d.appliedAt),
+  appliedAt: iso(d.createdAt) || iso(d.appliedAt) || iso(d._fbCreateTime),
   reviewNote: d.reviewNote ? str(d.reviewNote) : undefined,
 });
 
@@ -191,8 +223,8 @@ const mapPayment = (id: string, d: Doc): Record<string, unknown> => {
     status: payStatus(d.paymentStatus || d.status),
     method,
     referenceId: str(d.razorpayPaymentId || d.upiRef || d.utr || d.paymentId || id),
-    date: iso(d.createdAt || d.appliedAt || d.paidAt || new Date().toISOString()),
-    createdAt: iso(d.createdAt || d.appliedAt || d.paidAt || new Date().toISOString()),
+    date: iso(d.createdAt || d.appliedAt || d.paidAt || d._fbCreateTime || new Date().toISOString()),
+    createdAt: iso(d.createdAt || d.appliedAt || d.paidAt || d._fbCreateTime || new Date().toISOString()),
   };
 };
 
@@ -204,9 +236,14 @@ interface Mapped {
 
 const REGISTRY: Record<string, Mapped> = {
   interns: {
-    collection: "users",
+    collection: "interns",
     map: mapIntern as unknown as Mapped["map"],
     searchable: (r) => [r.name, r.email, r.phone, r.internId, r.college].map(String),
+  },
+  users: {
+    collection: "users",
+    map: mapUser,
+    searchable: (r) => [r.name, r.email, r.phone, r.college].map(String),
   },
   applications: {
     collection: "applications",
@@ -224,7 +261,7 @@ const REGISTRY: Record<string, Mapped> = {
     searchable: (r) => [r.certificateId, r.internName, r.internRef, r.internEmail, r.program].map(String),
   },
   mentors: {
-    collection: "mentors",
+    collection: "mentor_users",
     map: mapMentor as unknown as Mapped["map"],
     searchable: (r) => [r.name, r.email].map(String),
   },
@@ -237,6 +274,21 @@ const REGISTRY: Record<string, Mapped> = {
     collection: "notifications",
     map: mapNotification as unknown as Mapped["map"],
     searchable: (r) => [r.title, r.message].map(String),
+  },
+  activity: {
+    collection: "audit_logs",
+    map: mapActivity,
+    searchable: (r) => [r.actor, r.action, r.details].map(String),
+  },
+  sessions: {
+    collection: "sessions",
+    map: (id, d) => ({ id, ...d }),
+    searchable: (r) => [r.userId, r.type, r.role].map(String),
+  },
+  contacts: {
+    collection: "contacts",
+    map: (id, d) => ({ id, ...d }),
+    searchable: (r) => [r.name, r.email, r.message, r.subject].map(String),
   },
 };
 
@@ -263,7 +315,7 @@ export async function queryCollection(name: string, opts: QueryOpts): Promise<Qu
     const col = db.collection(def.collection);
 
     if (opts.id) {
-      const doc = await col.findOne({ $or: [{ id: opts.id }, { _id: opts.id as any }] });
+      const doc = await col.findOne({ $or: [{ id: opts.id }, { _id: opts.id as any }, { internId: opts.id }] });
       return {
         rows: [],
         total: doc ? 1 : 0,
@@ -272,9 +324,6 @@ export async function queryCollection(name: string, opts: QueryOpts): Promise<Qu
     }
 
     const filter: Record<string, unknown> = {};
-    if (name === "interns") {
-      filter.type = "student";
-    }
 
     if (opts.search && opts.search.trim()) {
       const regex = new RegExp(escapeRegex(opts.search.trim()), "i");
@@ -284,13 +333,21 @@ export async function queryCollection(name: string, opts: QueryOpts): Promise<Qu
         { phone: regex },
         { college: regex },
         { certificateId: regex },
+        { internId: regex },
+        { actor: regex },
+        { action: regex },
       ];
     }
 
     const total = await col.countDocuments(filter);
+    const sortField: Record<string, 1 | -1> =
+      name === "activity" ? { ts: -1, createdAt: -1 } :
+      name === "certificates" ? { issuedAt: -1, createdAt: -1 } :
+      { createdAt: -1, _fbCreateTime: -1, updatedAt: -1 };
+
     const docs = await col
       .find(filter)
-      .sort({ createdAt: -1 })
+      .sort(sortField)
       .skip((opts.page - 1) * opts.pageSize)
       .limit(opts.pageSize)
       .toArray();

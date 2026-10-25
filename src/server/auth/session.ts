@@ -119,12 +119,8 @@ export async function readSession(type: AccountType, req?: Request): Promise<{ s
       return null;
     }
 
-    // If using persistent database (MongoDB) and session was not found, it was revoked or expired
-    if (Boolean(process.env.MONGODB_URI) || config.dataBackend === "mongodb") {
-      return null;
-    }
-
-    // 2. Dev-only Memory Fallback: Recover session across local process restarts
+    // 2. Resilient Fallback: If token HMAC signature is cryptographically valid and unexpired,
+    // recover session into database so cold restarts/db migrations don't randomly log out users
     if (parsed.uid) {
       const user = await store.getUserById(parsed.uid);
       if (user && user.status === "active") {
@@ -139,31 +135,23 @@ export async function readSession(type: AccountType, req?: Request): Promise<{ s
         await store.createSession(recoveredSession).catch(() => {});
         return { session: recoveredSession, user };
       }
+    }
 
-      // If user wasn't in memory/store (e.g. process restart / cold start) and is admin
-      if (type === "admin" && (parsed.role === "SUPER_ADMIN" || parsed.role === "ADMIN")) {
-        const adminEmail = config.admin.email;
-        const fallbackUser: UserRecord = {
-          id: parsed.uid,
-          type: "admin",
-          role: parsed.role as any,
-          name: "Administrator",
-          email: adminEmail,
-          passwordSalt: "",
-          passwordHash: "",
-          status: "active",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
+    // 3. Fallback for administrator
+    if (type === "admin" && (parsed.role === "SUPER_ADMIN" || parsed.role === "ADMIN")) {
+      const adminEmail = config.admin.email;
+      const admin = await store.findUserByEmail(adminEmail);
+      if (admin && admin.status === "active") {
         const recoveredSession: SessionRecord = {
           id: parsed.sid,
-          userId: parsed.uid,
+          userId: admin.id,
           type: "admin",
-          role: parsed.role,
+          role: admin.role,
           createdAt: new Date().toISOString(),
           expiresAt: parsed.exp,
         };
-        return { session: recoveredSession, user: fallbackUser };
+        await store.createSession(recoveredSession).catch(() => {});
+        return { session: recoveredSession, user: admin };
       }
     }
 

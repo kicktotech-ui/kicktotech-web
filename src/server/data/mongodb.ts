@@ -95,10 +95,26 @@ export function createMongoStore(): DataStore {
 
     async getUserById(id: string): Promise<UserRecord | null> {
       const db = await getMongoDb();
-      const doc = await db.collection("users").findOne({ id });
+      let doc = await db.collection("users").findOne({
+        $or: [{ id }, { uid: id }, { _id: id as any }],
+      });
+      if (!doc) {
+        try {
+          doc = await db.collection("users").findOne({ _id: new (await import("mongodb")).ObjectId(id) });
+        } catch {
+          // not a valid ObjectId string
+        }
+      }
       if (!doc) return null;
       const { _id, ...user } = doc;
-      return user as unknown as UserRecord;
+      return {
+        ...user,
+        id: user.id || user.uid || String(_id),
+        type: user.type || (user.role === "admin" || user.role === "SUPER_ADMIN" ? "admin" : "student"),
+        role: user.role || "student",
+        name: user.name || "Student",
+        email: user.email || "",
+      } as unknown as UserRecord;
     },
 
     async createUser(record: UserRecord): Promise<UserRecord> {
@@ -117,33 +133,70 @@ export function createMongoStore(): DataStore {
 
     async listStudents({ search, page, pageSize }): Promise<PageResult<UserRecord>> {
       const db = await getMongoDb();
-      const filter: Record<string, unknown> = { type: "student" };
+      const baseStudentFilter: Record<string, unknown> = {
+        $or: [
+          { type: "student" },
+          { role: "student" },
+          { role: "professional" },
+          { type: { $ne: "admin" } },
+        ],
+      };
+
+      let filter: Record<string, unknown> = baseStudentFilter;
+
       if (search && search.trim()) {
         const regex = new RegExp(escapeRegex(search.trim()), "i");
-        filter.$or = [
-          { name: regex },
-          { email: regex },
-          { phone: regex },
-          { college: regex },
-        ];
+        filter = {
+          $and: [
+            baseStudentFilter,
+            {
+              $or: [
+                { name: regex },
+                { email: regex },
+                { phone: regex },
+                { college: regex },
+              ],
+            },
+          ],
+        };
       }
 
       const total = await db.collection("users").countDocuments(filter);
       const docs = await db
         .collection("users")
         .find(filter)
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: -1, _fbCreateTime: -1 })
         .skip((page - 1) * pageSize)
         .limit(pageSize)
         .toArray();
 
-      const rows = docs.map(({ _id, ...rest }) => rest as unknown as UserRecord);
+      const rows = docs.map(({ _id, ...rest }) => ({
+        id: rest.id || rest.uid || String(_id),
+        type: rest.type || (rest.role === "admin" || rest.role === "SUPER_ADMIN" ? "admin" : "student"),
+        role: rest.role || "student",
+        name: rest.name || "Student",
+        email: rest.email || "",
+        phone: rest.phone || "",
+        college: rest.college || (rest.details && typeof rest.details === "object" ? (rest.details as any).college : "") || "",
+        company: rest.company || "",
+        status: rest.status || "active",
+        createdAt: typeof rest.createdAt === "string" ? rest.createdAt : rest._fbCreateTime || new Date().toISOString(),
+        updatedAt: typeof rest.updatedAt === "string" ? rest.updatedAt : rest._fbUpdateTime || new Date().toISOString(),
+        passwordSalt: rest.passwordSalt || "",
+        passwordHash: rest.passwordHash || "",
+      })) as UserRecord[];
+
       return { rows, total };
     },
 
     async countStudents(activeOnly?: boolean): Promise<number> {
       const db = await getMongoDb();
-      const filter: Record<string, unknown> = { type: "student" };
+      const internCount = await db.collection("interns").countDocuments({});
+      if (internCount > 0) return internCount;
+
+      const filter: Record<string, unknown> = {
+        $or: [{ type: "student" }, { role: "student" }, { type: { $ne: "admin" } }],
+      };
       if (activeOnly) {
         filter.status = "active";
       }
