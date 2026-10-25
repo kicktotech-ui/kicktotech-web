@@ -13,3 +13,7 @@ next-env.d.ts
 *firebase-adminsdk*.json
 *serviceAccount*.json
 service-account*.json
+scripts/fb_key.txt
+scripts/firebase_dump/
+*.key
+*.pem
