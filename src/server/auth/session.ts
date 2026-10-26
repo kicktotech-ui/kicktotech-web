@@ -113,7 +113,7 @@ export async function readSession(type: AccountType, req?: Request): Promise<{ s
         return null;
       }
       const user = await store.getUserById(session.userId);
-      if (user && user.status === "active") {
+      if (user && user.status !== "disabled") {
         return { session, user };
       }
       return null;
@@ -123,7 +123,7 @@ export async function readSession(type: AccountType, req?: Request): Promise<{ s
     // recover session into database so cold restarts/db migrations don't randomly log out users
     if (parsed.uid) {
       const user = await store.getUserById(parsed.uid);
-      if (user && user.status === "active") {
+      if (user && user.status !== "disabled") {
         const recoveredSession: SessionRecord = {
           id: parsed.sid,
           userId: user.id,
@@ -141,7 +141,7 @@ export async function readSession(type: AccountType, req?: Request): Promise<{ s
     if (type === "admin" && (parsed.role === "SUPER_ADMIN" || parsed.role === "ADMIN")) {
       const adminEmail = config.admin.email;
       const admin = await store.findUserByEmail(adminEmail);
-      if (admin && admin.status === "active") {
+      if (admin && admin.status !== "disabled") {
         const recoveredSession: SessionRecord = {
           id: parsed.sid,
           userId: admin.id,

@@ -69,7 +69,7 @@ export async function loginStudent(input: LoginInput, meta: { ip: string; reques
     await writeAudit({ actor: input.email, action: "STUDENT_LOGIN", result: "FAILED", requestId: meta.requestId, ip: meta.ip });
     throw new AppError("INVALID_CREDENTIALS", "Invalid email or password.");
   }
-  if (user.status !== "active") {
+  if (user.status === "disabled") {
     throw new AppError("FORBIDDEN", "This account is disabled. Contact support.");
   }
   const { token } = await createSession("student", user);
@@ -176,7 +176,7 @@ export async function loginAdmin(input: LoginInput, meta: { ip: string; requestI
     throw new AppError("INVALID_CREDENTIALS", "Invalid credentials. Check your admin email and password.");
   }
 
-  if (admin.status !== "active") {
+  if (admin.status === "disabled") {
     throw new AppError("FORBIDDEN", "This administrator account is disabled.");
   }
 
@@ -222,7 +222,7 @@ export async function verifyPasswordResetToken(token: string): Promise<UserRecor
 
     const store = getStore();
     const user = await store.getUserById(data.uid);
-    if (!user || user.status !== "active") return null;
+    if (!user || user.status === "disabled") return null;
     if (user.email.toLowerCase().trim() !== data.email.toLowerCase().trim()) return null;
     // Replay check: if password was already changed, hashSlice will not match
     if (data.hashSlice && (user.passwordHash || "").slice(0, 10) !== data.hashSlice) return null;

@@ -8,6 +8,8 @@ import {
   type CertificateStatus,
   type PageResult,
   type ApplicationRecord,
+  type AccountType,
+  type UserStatus,
 } from "./index";
 import { uuid } from "../crypto";
 import { AppError } from "../http";
@@ -79,6 +81,34 @@ async function initMongoIndexes(db: Db): Promise<void> {
   ]);
 }
 
+function normalizeUserRecord(doc: any): UserRecord {
+  const { _id, ...rest } = doc;
+  const role = rest.role || "student";
+  const type: AccountType =
+    rest.type || (role === "admin" || role === "SUPER_ADMIN" ? "admin" : "student");
+  const status: UserStatus = rest.status === "disabled" ? "disabled" : "active";
+
+  return {
+    ...rest,
+    id: rest.id || rest.uid || String(_id),
+    type,
+    role,
+    name: rest.name || "Student",
+    email: (rest.email || "").trim().toLowerCase(),
+    phone: rest.phone || "",
+    college:
+      rest.college ||
+      (rest.details && typeof rest.details === "object" ? (rest.details as any).college : "") ||
+      "",
+    company: rest.company || "",
+    status,
+    createdAt: typeof rest.createdAt === "string" ? rest.createdAt : rest._fbCreateTime || new Date().toISOString(),
+    updatedAt: typeof rest.updatedAt === "string" ? rest.updatedAt : rest._fbUpdateTime || new Date().toISOString(),
+    passwordSalt: rest.passwordSalt || "",
+    passwordHash: rest.passwordHash || "",
+  };
+}
+
 export function createMongoStore(): DataStore {
   return {
     newId: () => uuid(),
@@ -89,8 +119,7 @@ export function createMongoStore(): DataStore {
       const normEmail = email.trim().toLowerCase();
       const doc = await db.collection("users").findOne({ email: normEmail });
       if (!doc) return null;
-      const { _id, ...user } = doc;
-      return user as unknown as UserRecord;
+      return normalizeUserRecord(doc);
     },
 
     async getUserById(id: string): Promise<UserRecord | null> {
@@ -106,15 +135,7 @@ export function createMongoStore(): DataStore {
         }
       }
       if (!doc) return null;
-      const { _id, ...user } = doc;
-      return {
-        ...user,
-        id: user.id || user.uid || String(_id),
-        type: user.type || (user.role === "admin" || user.role === "SUPER_ADMIN" ? "admin" : "student"),
-        role: user.role || "student",
-        name: user.name || "Student",
-        email: user.email || "",
-      } as unknown as UserRecord;
+      return normalizeUserRecord(doc);
     },
 
     async createUser(record: UserRecord): Promise<UserRecord> {

@@ -24,7 +24,7 @@ export const POST = route(async (req, { requestId }) => {
     return fail("NOT_FOUND", "No account found with this email address. Please check your spelling or register an account.");
   }
 
-  if (user.status !== "active") {
+  if (user.status === "disabled") {
     return fail("FORBIDDEN", "This account is currently disabled. Please contact support at contact@kicktotech.in.");
   }
 

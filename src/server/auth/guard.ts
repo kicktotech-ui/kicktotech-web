@@ -27,7 +27,7 @@ export interface AuthenticatedStudent {
  */
 export async function requireAuthenticatedStudent(req: Request): Promise<AuthenticatedStudent> {
   const ctx = await readSession("student", req);
-  if (!ctx || !ctx.user || ctx.user.status !== "active") {
+  if (!ctx || !ctx.user || ctx.user.status === "disabled") {
     throw new AppError("UNAUTHENTICATED", "You must be signed in to access this resource.");
   }
   return {
